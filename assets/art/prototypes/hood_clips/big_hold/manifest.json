@@ -1,0 +1,27 @@
+{
+  "name": "big_hold",
+  "frames": 1,
+  "fps": 24.06,
+  "source_fps": 24.06,
+  "scale": 0.528,
+  "root": [
+    192.0,
+    348.0
+  ],
+  "canvas": 384,
+  "source_root": [
+    456.8,
+    759.0
+  ],
+  "loop": false,
+  "source_frames": [
+    90,
+    90
+  ],
+  "hold_points": [
+    [
+      -54.80640000000001,
+      -117.744
+    ]
+  ]
+}

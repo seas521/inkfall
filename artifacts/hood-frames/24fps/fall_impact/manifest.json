@@ -1,0 +1,22 @@
+{
+  "name": "fall_impact",
+  "frames": 17,
+  "fps": 24.06,
+  "source_fps": 24.06,
+  "scale": 0.528,
+  "root": [
+    192.0,
+    348.0
+  ],
+  "canvas": 384,
+  "source_root": [
+    456.8,
+    759.0
+  ],
+  "loop": false,
+  "source_frames": [
+    56,
+    72
+  ],
+  "mode": "both"
+}

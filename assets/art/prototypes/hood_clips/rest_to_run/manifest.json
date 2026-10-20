@@ -1,0 +1,15 @@
+{
+  "name": "rest_to_run",
+  "frames": 4,
+  "fps": 60.0,
+  "loop": false,
+  "canvas": 256,
+  "root": [
+    128.0,
+    232.0
+  ],
+  "frame_factor": 1.0,
+  "upsampled": true,
+  "exit_run_index": 16,
+  "note": "interpolated frames from the resting pose into run_left[exit_run_index]"
+}

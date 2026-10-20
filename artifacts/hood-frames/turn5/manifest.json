@@ -1,0 +1,21 @@
+{
+  "name": "turn5",
+  "frames": 22,
+  "fps": 24.12,
+  "source_fps": 24.12,
+  "scale": 0.2736,
+  "root": [
+    128.0,
+    232.0
+  ],
+  "canvas": 256,
+  "source_root": [
+    492.0,
+    833.0
+  ],
+  "loop": false,
+  "source_frames": [
+    6,
+    114
+  ]
+}

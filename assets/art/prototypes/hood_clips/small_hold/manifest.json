@@ -1,0 +1,28 @@
+{
+  "name": "small_hold",
+  "frames": 1,
+  "fps": 24.06,
+  "source_fps": 24.06,
+  "scale": 0.528,
+  "root": [
+    192.0,
+    348.0
+  ],
+  "canvas": 384,
+  "source_root": [
+    456.8,
+    759.0
+  ],
+  "loop": false,
+  "source_frames": [
+    50,
+    50
+  ],
+  "hold_points": [
+    [
+      -41.32722758620691,
+      -111.89958620689654
+    ]
+  ],
+  "pinned_to_ground": false
+}

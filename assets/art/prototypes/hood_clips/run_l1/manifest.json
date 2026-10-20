@@ -1,0 +1,25 @@
+{
+  "name": "run_l1",
+  "frames": 20,
+  "fps": 60.0,
+  "source_fps": 24.06,
+  "scale": 0.528,
+  "root": [
+    128.0,
+    232.0
+  ],
+  "canvas": 256,
+  "source_root": [
+    456.8,
+    759.0
+  ],
+  "loop": true,
+  "source_frames": [
+    152,
+    164
+  ],
+  "original_frames": 13,
+  "original_fps": 24.06,
+  "frame_factor": 1.5384615384615385,
+  "upsampled": true
+}

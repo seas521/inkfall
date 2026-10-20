@@ -1,0 +1,6 @@
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/prototypes/wizard_rig/wizard_rig_lab.gd" id="1"]
+
+[node name="WizardRigLab" type="Node2D"]
+script = ExtResource("1")

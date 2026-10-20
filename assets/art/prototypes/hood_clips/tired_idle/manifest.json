@@ -1,0 +1,26 @@
+{
+  "name": "tired_idle",
+  "frames": 60,
+  "fps": 60.0,
+  "source_fps": 24.12,
+  "scale": 0.528,
+  "root": [
+    192.0,
+    348.0
+  ],
+  "canvas": 384,
+  "source_root": [
+    456.8,
+    759.0
+  ],
+  "loop": true,
+  "source_frames": [
+    108,
+    120
+  ],
+  "pinned_to_ground": false,
+  "original_frames": 24,
+  "original_fps": 24.0,
+  "frame_factor": 2.5,
+  "upsampled": true
+}

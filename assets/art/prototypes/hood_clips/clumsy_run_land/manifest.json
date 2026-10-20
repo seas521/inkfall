@@ -1,0 +1,55 @@
+{
+  "name": "clumsy_run_land",
+  "frames": 27,
+  "fps": 60.0,
+  "source_fps": 24.15,
+  "scale": 0.528,
+  "root": [
+    192.0,
+    348.0
+  ],
+  "canvas": 384,
+  "source_root": [
+    456.8,
+    759.0
+  ],
+  "loop": false,
+  "source_frames": [
+    65,
+    84
+  ],
+  "pinned_to_ground": false,
+  "original_frames": 17,
+  "original_fps": 24.0,
+  "frame_factor": 1.588235294117647,
+  "upsampled": true,
+  "exit_to_run": [
+    2,
+    39,
+    24,
+    24,
+    24,
+    61,
+    62,
+    63,
+    64,
+    10,
+    11,
+    12,
+    68,
+    33,
+    34,
+    35,
+    19,
+    58,
+    59,
+    23,
+    24,
+    62,
+    63,
+    65,
+    29,
+    68,
+    69
+  ]
+}

@@ -1,0 +1,26 @@
+{
+  "name": "run_left",
+  "frames": 30,
+  "fps": 60.0,
+  "source_fps": 24.06,
+  "scale": 0.528,
+  "root": [
+    128.0,
+    232.0
+  ],
+  "canvas": 256,
+  "source_root": [
+    456.8,
+    759.0
+  ],
+  "loop": true,
+  "source_frames": [
+    152,
+    164
+  ],
+  "original_frames": 13,
+  "original_fps": 24.06,
+  "frame_factor": 2.3076923076923075,
+  "upsampled": true,
+  "entry_from_rest": 8
+}

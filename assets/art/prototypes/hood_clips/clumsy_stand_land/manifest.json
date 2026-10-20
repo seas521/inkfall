@@ -1,0 +1,26 @@
+{
+  "name": "clumsy_stand_land",
+  "frames": 40,
+  "fps": 60.0,
+  "source_fps": 24.15,
+  "scale": 0.528,
+  "root": [
+    192.0,
+    348.0
+  ],
+  "canvas": 384,
+  "source_root": [
+    456.8,
+    759.0
+  ],
+  "loop": false,
+  "source_frames": [
+    46,
+    84
+  ],
+  "pinned_to_ground": false,
+  "original_frames": 38,
+  "original_fps": 24.0,
+  "frame_factor": 1.0526315789473684,
+  "upsampled": true
+}

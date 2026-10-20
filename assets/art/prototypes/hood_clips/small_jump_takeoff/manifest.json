@@ -1,0 +1,40 @@
+{
+  "name": "small_jump_takeoff",
+  "frames": 5,
+  "fps": 60.0,
+  "source_fps": 24.06,
+  "scale": 0.528,
+  "root": [
+    192.0,
+    348.0
+  ],
+  "canvas": 384,
+  "source_root": [
+    456.8,
+    759.0
+  ],
+  "loop": false,
+  "source_frames": [
+    144,
+    146
+  ],
+  "hold_points": [
+    [
+      -50.02207346938777,
+      -79.11379591836737
+    ],
+    [
+      -49.142399999999995,
+      -96.82133333333336
+    ],
+    [
+      -47.78710588235294,
+      -115.78211764705881
+    ]
+  ],
+  "pinned_to_ground": true,
+  "original_frames": 3,
+  "original_fps": 32.0,
+  "frame_factor": 1.6666666666666667,
+  "upsampled": true
+}

@@ -1,0 +1,45 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="720" viewBox="0 0 1280 720">
+  <defs>
+    <filter id="terrain" x="-4%" y="-5%" width="108%" height="110%">
+      <feTurbulence type="fractalNoise" baseFrequency="0.011 0.035" numOctaves="2" seed="31" result="noise"/>
+      <feDisplacementMap in="SourceGraphic" in2="noise" scale="1.8" xChannelSelector="R" yChannelSelector="B" result="rough"/>
+      <feGaussianBlur in="rough" stdDeviation="0.7"/>
+    </filter>
+    <linearGradient id="mass" x1="0" y1="0" x2="0.2" y2="1">
+      <stop offset="0" stop-color="#090a0a"/>
+      <stop offset="0.35" stop-color="#040505"/>
+      <stop offset="1" stop-color="#010202"/>
+    </linearGradient>
+  </defs>
+  <g fill="url(#mass)" filter="url(#terrain)">
+    <path d="M0 354
+             C18 365 34 382 49 397
+             C65 413 82 425 104 432
+             C139 428 171 434 203 430
+             C239 426 270 432 302 428
+             C335 425 362 430 390 432
+             C413 434 432 438 448 445
+             C465 451 478 458 492 468
+             C510 481 521 493 532 509
+             C545 528 553 544 565 555
+             C575 563 588 568 603 571
+             L603 720 L0 720 Z"/>
+    <path d="M1053 720
+             L1053 584
+             C1058 575 1072 571 1086 566
+             C1101 560 1109 548 1122 538
+             C1138 525 1156 516 1175 508
+             C1196 499 1213 495 1232 489
+             C1249 484 1265 478 1280 472
+             L1280 720 Z"/>
+  </g>
+  <g fill="#050606" filter="url(#terrain)">
+    <path d="M126 432 C127 424 126 418 129 411 C130 419 130 425 131 432 Z"/>
+    <path d="M133 431 C134 426 137 421 140 417 C138 424 138 428 138 432 Z"/>
+    <path d="M286 430 C286 423 288 418 291 413 C290 420 290 425 291 430 Z"/>
+    <path d="M294 430 C296 424 300 421 304 418 C301 424 300 428 300 431 Z"/>
+    <path d="M423 439 C422 431 423 425 426 420 C426 428 427 433 428 441 Z"/>
+    <path d="M432 442 C434 434 437 430 441 427 C438 434 438 439 438 445 Z"/>
+    <path d="M1144 526 C1145 520 1148 516 1152 512 C1150 519 1150 522 1150 524 Z"/>
+  </g>
+</svg>

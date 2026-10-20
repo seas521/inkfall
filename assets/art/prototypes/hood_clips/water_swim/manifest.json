@@ -1,0 +1,25 @@
+{
+  "name": "water_swim",
+  "frames": 30,
+  "fps": 60.0,
+  "source_fps": 24.06,
+  "scale": 0.528,
+  "root": [
+    192.0,
+    192.0
+  ],
+  "canvas": 384,
+  "source_root": [
+    456.8,
+    759.0
+  ],
+  "loop": true,
+  "source_frames": [
+    116,
+    127
+  ],
+  "original_frames": 12,
+  "original_fps": 24.06,
+  "frame_factor": 2.5,
+  "upsampled": true
+}

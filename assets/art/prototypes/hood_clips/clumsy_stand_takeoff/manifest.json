@@ -1,0 +1,26 @@
+{
+  "name": "clumsy_stand_takeoff",
+  "frames": 8,
+  "fps": 64.0,
+  "source_fps": 24.15,
+  "scale": 0.528,
+  "root": [
+    192.0,
+    348.0
+  ],
+  "canvas": 384,
+  "source_root": [
+    456.8,
+    759.0
+  ],
+  "loop": false,
+  "source_frames": [
+    12,
+    29
+  ],
+  "pinned_to_ground": false,
+  "original_frames": 18,
+  "original_fps": 24.0,
+  "frame_factor": 0.4444444444444444,
+  "upsampled": true
+}

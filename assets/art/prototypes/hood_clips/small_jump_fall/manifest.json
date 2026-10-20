@@ -1,0 +1,44 @@
+{
+  "name": "small_jump_fall",
+  "frames": 8,
+  "fps": 60.0,
+  "source_fps": 24.06,
+  "scale": 0.528,
+  "root": [
+    192.0,
+    348.0
+  ],
+  "canvas": 384,
+  "source_root": [
+    456.8,
+    759.0
+  ],
+  "loop": false,
+  "source_frames": [
+    154,
+    157
+  ],
+  "hold_points": [
+    [
+      -48.0900129032258,
+      -102.45470967741937
+    ],
+    [
+      -48.19023673469389,
+      -107.66889795918368
+    ],
+    [
+      -48.42398241758241,
+      -114.72685714285714
+    ],
+    [
+      -48.50850309278353,
+      -119.84511340206187
+    ]
+  ],
+  "pinned_to_ground": true,
+  "original_frames": 4,
+  "original_fps": 24.06,
+  "frame_factor": 2.0,
+  "upsampled": true
+}

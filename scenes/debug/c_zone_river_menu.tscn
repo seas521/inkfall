@@ -1,0 +1,6 @@
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="PackedScene" path="res://scenes/debug/c_zone_river.tscn" id="1"]
+
+[node name="CZoneRiver" instance=ExtResource("1")]
+return_to_debug_menu = true

@@ -1,0 +1,21 @@
+{
+  "name": "brake_turn",
+  "frames": 33,
+  "fps": 24.06,
+  "source_fps": 24.06,
+  "scale": 0.2736,
+  "root": [
+    128.0,
+    232.0
+  ],
+  "canvas": 256,
+  "source_root": [
+    466.1,
+    833.0
+  ],
+  "loop": false,
+  "source_frames": [
+    92,
+    124
+  ]
+}

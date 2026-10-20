@@ -1,0 +1,26 @@
+{
+  "name": "fall_air",
+  "frames": 88,
+  "fps": 60.0,
+  "source_fps": 24.06,
+  "scale": 0.528,
+  "root": [
+    192.0,
+    348.0
+  ],
+  "canvas": 384,
+  "source_root": [
+    456.8,
+    759.0
+  ],
+  "loop": false,
+  "source_frames": [
+    20,
+    55
+  ],
+  "mode": "air",
+  "original_frames": 36,
+  "original_fps": 24.06,
+  "frame_factor": 2.4444444444444446,
+  "upsampled": true
+}

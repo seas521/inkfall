@@ -1,0 +1,22 @@
+{
+  "name": "tired_rise_a",
+  "frames": 13,
+  "fps": 12.0,
+  "source_fps": 24.12,
+  "scale": 0.528,
+  "root": [
+    192.0,
+    348.0
+  ],
+  "canvas": 384,
+  "source_root": [
+    456.8,
+    759.0
+  ],
+  "loop": false,
+  "source_frames": [
+    44,
+    68
+  ],
+  "pinned_to_ground": false
+}

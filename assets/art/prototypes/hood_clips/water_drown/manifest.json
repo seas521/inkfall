@@ -1,0 +1,25 @@
+{
+  "name": "water_drown",
+  "frames": 73,
+  "fps": 60.0,
+  "source_fps": 24.06,
+  "scale": 0.528,
+  "root": [
+    192.0,
+    60.0
+  ],
+  "canvas": 384,
+  "source_root": [
+    456.8,
+    759.0
+  ],
+  "loop": false,
+  "source_frames": [
+    183,
+    212
+  ],
+  "original_frames": 30,
+  "original_fps": 24.06,
+  "frame_factor": 2.433333333333333,
+  "upsampled": true
+}

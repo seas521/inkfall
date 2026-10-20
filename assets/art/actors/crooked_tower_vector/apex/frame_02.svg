@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="192" height="192" viewBox="0 0 192 192">
+<!-- apex frame 02 | fixed canvas 192x192 | root 96,174 -->
+<g fill="#010203" stroke="#010203" stroke-linecap="round" stroke-linejoin="round">
+<path d="M 86.26 129.26 Q 85.72 149.87 90.74 164.74" fill="none" stroke-width="11"/>
+<path d="M 100.26 129.26 Q 100.65 149.42 95.52 165.74" fill="none" stroke-width="12"/>
+<path d="M 82.26 103.26 Q 79.91 112.29 83.52 116.78" fill="none" stroke-width="10"/>
+<g transform="rotate(0.10 93.26 115.26) scale(1.000 1.000)"><path d="M 78.26 92.26 L 73.26 108.26 L 77.26 128.26 L 82.26 137.26 L 90.26 133.26 L 97.26 139.26 L 105.26 133.26 L 110.26 127.26 L 112.26 107.26 L 107.26 92.26 Z"/></g>
+<path d="M 105.26 102.26 Q 106.97 107.49 102.78 108.48" fill="none" stroke-width="11"/>
+<circle cx="83.52" cy="116.78" r="5.8"/>
+<circle cx="102.78" cy="108.48" r="5.4"/>
+
+<g transform="rotate(-0.20 99.26 52.26) scale(1.000 1.000)"><path d="M 50.26 5.26 L 89.26 14.26 L 89.26 23.26 L 102.26 21.26 L 102.26 11.26 L 117.26 15.26 L 117.26 24.26 L 135.26 30.26 L 136.26 60.26 L 123.26 63.26 L 132.26 70.26 L 129.26 87.26 L 116.26 91.26 L 105.26 84.26 L 64.26 88.26 L 51.26 68.26 L 55.26 42.26 Z"/></g>
+</g>
+<ellipse cx="119.76" cy="62.26" rx="6.80" ry="3.8" fill="#ffad42"/>
+<path d="M 117.26 72.26 Q 121.26 75.26 125.26 71.76" fill="none" stroke="#d7792d" stroke-width="2.5" stroke-linecap="round"/>
+</svg>

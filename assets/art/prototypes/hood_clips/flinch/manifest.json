@@ -1,0 +1,26 @@
+{
+  "name": "flinch",
+  "frames": 153,
+  "fps": 60.0,
+  "source_fps": 24.06,
+  "scale": 0.528,
+  "root": [
+    192.0,
+    348.0
+  ],
+  "canvas": 384,
+  "source_root": [
+    456.8,
+    759.0
+  ],
+  "loop": false,
+  "source_frames": [
+    177,
+    238
+  ],
+  "mode": "",
+  "original_frames": 62,
+  "original_fps": 24.06,
+  "frame_factor": 2.467741935483871,
+  "upsampled": true
+}

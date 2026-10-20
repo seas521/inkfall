@@ -1,0 +1,17 @@
+{
+  "frames": 120,
+  "scale": 0.255,
+  "floor": 846.0,
+  "canvas": [384, 320],
+  "root": [192.0, 280.0],
+  "source": "/Users/xiangxi.li/Downloads/jimeng-2026-10-12-8441-生成一段5秒的横版游戏角色动画，使用上传图片中的同一个角色，连续展示“向前用力推....mp4",
+  "rod_start": 58,
+  "root_keys": [[0, 472], [28, 480], [48, 706], [62, 714], [68, 687], [76, 607], [84, 569], [92, 547], [100, 517], [108, 517], [119, 472]],
+  "clips": [
+    {"name": "push", "label": "推：伸手与前压", "start": 8, "end": 37, "loop_ready": false, "note": "源帧 8–37：伸手、前倾和短步。已避开裁边；不是完整无缝步态。"},
+    {"name": "push_step", "label": "推：短步候选", "start": 24, "end": 37, "loop_ready": false},
+    {"name": "pull", "label": "拉：后仰与退步", "start": 68, "end": 105, "loop_ready": false, "note": "源帧 68–105：后仰与退步，长杆已去除。握手边缘与衔接仍需验收。"},
+    {"name": "pull_cycle", "label": "拉：循环候选", "start": 83, "end": 96, "loop_ready": false, "note": "源帧 83–96：14 张连续帧，循环候选；未做倒放或过渡补帧。"},
+    {"name": "release", "label": "松手回站立", "start": 106, "end": 119, "loop_ready": false}
+  ]
+}

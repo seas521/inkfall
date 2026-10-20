@@ -1,0 +1,26 @@
+{
+  "name": "get_up",
+  "frames": 136,
+  "fps": 60.0,
+  "source_fps": 24.06,
+  "scale": 0.528,
+  "root": [
+    192.0,
+    348.0
+  ],
+  "canvas": 384,
+  "source_root": [
+    456.8,
+    759.0
+  ],
+  "loop": false,
+  "source_frames": [
+    98,
+    152
+  ],
+  "mode": "ground",
+  "original_frames": 55,
+  "original_fps": 24.06,
+  "frame_factor": 2.4727272727272727,
+  "upsampled": true
+}

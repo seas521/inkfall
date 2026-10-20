@@ -1,0 +1,79 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="192" height="192" viewBox="0 0 192 192">
+  <!-- Crooked Tower Knight base model v2 · fixed root (96,174) -->
+  <g fill="#010203">
+    <!-- Far boot: one continuous mass, no circular joint. -->
+    <path d="M 83 151
+             C 80 157, 79 165, 80 171
+             C 82 174, 91 175, 97 173
+             L 96 168
+             C 93 166, 93 157, 92 151
+             Z"/>
+
+    <!-- Near boot: short leg and broad foot remain joined. -->
+    <path d="M 96 151
+             C 97 157, 98 164, 97 168
+             C 99 172, 105 174, 112 173
+             C 114 171, 111 168, 107 166
+             C 106 160, 106 155, 104 151
+             Z"/>
+
+    <!-- Far arm and mitten are one soft silhouette. -->
+    <path d="M 78 119
+             C 70 121, 65 128, 63 137
+             C 61 145, 63 151, 68 154
+             C 71 156, 75 154, 76 151
+             C 78 149, 77 145, 74 143
+             C 75 136, 79 131, 84 128
+             Z"/>
+
+    <!-- Compact tunic body tucked directly under the helmet. -->
+    <path d="M 79 113
+             C 84 110, 100 110, 105 114
+             C 111 120, 112 131, 110 142
+             L 108 153
+             C 105 158, 100 160, 96 157
+             L 92 163
+             L 87 158
+             C 82 160, 77 156, 75 151
+             L 74 137
+             C 73 126, 74 118, 79 113
+             Z"/>
+
+    <!-- Near arm: shoulder, bent forearm and mitten stay connected. -->
+    <path d="M 104 119
+             C 112 121, 118 127, 120 136
+             C 122 141, 125 145, 123 149
+             C 121 153, 116 155, 113 152
+             C 110 150, 111 146, 114 143
+             C 112 137, 107 133, 101 130
+             Z"/>
+
+    <!-- Approved crooked-tower giant helmet silhouette. -->
+    <path d="M 49 31
+             L 88 40
+             L 88 49
+             L 101 47
+             L 101 37
+             L 116 41
+             L 116 50
+             L 134 56
+             L 135 86
+             L 122 89
+             L 131 96
+             L 128 113
+             L 115 117
+             L 104 110
+             L 63 114
+             L 50 94
+             L 54 68
+             Z"/>
+  </g>
+
+  <!-- Expression is the only stable light. -->
+  <ellipse cx="118.5" cy="88" rx="6.8" ry="3.8" fill="#ffad42"/>
+  <path d="M 116 98 Q 120 101 124 97.5"
+        fill="none"
+        stroke="#d7792d"
+        stroke-width="2.5"
+        stroke-linecap="round"/>
+</svg>

@@ -1,0 +1,6 @@
+[gd_scene format=3 uid="uid://dov0go2e5qo6a"]
+
+[ext_resource type="Script" path="res://scripts/demos/luma_flipbook_demo.gd" id="1_flipbook"]
+
+[node name="LumaFlipbookWaterDemo" type="Node2D" unique_id=1705058219]
+script = ExtResource("1_flipbook")

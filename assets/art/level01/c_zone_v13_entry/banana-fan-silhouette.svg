@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="42" height="42" viewBox="0 0 42 42">
+  <defs>
+    <filter id="soft" x="-10%" y="-10%" width="120%" height="120%">
+      <feGaussianBlur stdDeviation="0.38"/>
+    </filter>
+  </defs>
+  <path d="M24 26
+           C18 27 11 24 7 20
+           C3 16 4 11 8 8
+           C12 4 18 4 22 7
+           C26 4 31 5 34 9
+           C37 14 34 20 30 23
+           C28 25 26 26 24 26 Z"
+        fill="#050606" filter="url(#soft)"/>
+  <path d="M23 23 C27 28 31 33 37 39"
+        fill="none" stroke="#050606" stroke-width="3.4"
+        stroke-linecap="round" filter="url(#soft)"/>
+</svg>

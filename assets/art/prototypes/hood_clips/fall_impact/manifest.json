@@ -1,0 +1,26 @@
+{
+  "name": "fall_impact",
+  "frames": 41,
+  "fps": 60.0,
+  "source_fps": 24.06,
+  "scale": 0.528,
+  "root": [
+    192.0,
+    348.0
+  ],
+  "canvas": 384,
+  "source_root": [
+    456.8,
+    759.0
+  ],
+  "loop": false,
+  "source_frames": [
+    56,
+    72
+  ],
+  "mode": "both",
+  "original_frames": 17,
+  "original_fps": 24.06,
+  "frame_factor": 2.411764705882353,
+  "upsampled": true
+}

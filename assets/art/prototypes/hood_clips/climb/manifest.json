@@ -1,0 +1,31 @@
+{
+  "name": "climb",
+  "frames": 92,
+  "fps": 60.0,
+  "source_fps": 24.0,
+  "scale": 0.528,
+  "root": [
+    192.0,
+    288.0
+  ],
+  "canvas": 384,
+  "source_root": [
+    497.0,
+    446.0
+  ],
+  "loop": false,
+  "lead_frames": 18,
+  "climb_frames": 77,
+  "start_feet": [
+    82.22727272727275,
+    156.0
+  ],
+  "hang_feet": [
+    82.22727272727275,
+    156.0
+  ],
+  "end_feet": [
+    -39.0,
+    0.0
+  ]
+}

@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="zh-CN">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>推拉动作 · 原视频抽帧</title>
+<style>
+*{box-sizing:border-box}body{margin:0;background:#eeeeeb;color:#262a29;font:14px system-ui,sans-serif;letter-spacing:0}header,main{max-width:1220px;margin:auto;padding:24px}header{border-bottom:1px solid #c9ceca}h1{font-size:24px;margin:0 0 10px}h2{font-size:16px;margin:0}p{line-height:1.7}.meta{color:#57665d}.toolbar{display:flex;align-items:center;flex-wrap:wrap;gap:16px;margin-bottom:24px}button,select{font:inherit;background:#fff;border:1px solid #a5ada6;border-radius:4px;padding:8px 14px;cursor:pointer}button.primary{background:#285a46;color:#fff;border-color:#285a46}label{display:flex;align-items:center;gap:6px}.grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:24px}.panel{min-width:0}.caption{display:flex;justify-content:space-between;align-items:center;gap:8px;min-height:40px}.status{font-size:12px;color:#687268}canvas{width:100%;aspect-ratio:1;display:block;background:#b9bdb8;border:1px solid #a6aca6}input[type=range]{width:100%;accent-color:#285a46}footer{border-top:1px solid #c9ceca;margin-top:28px;padding-top:16px;color:#535e56}a{color:#285a46}.warning{color:#805420}.number{font-variant-numeric:tabular-nums;font-size:12px}.controls{display:flex;justify-content:space-between;align-items:center;gap:8px;margin:10px 0}.controls button{padding:5px 12px}@media(max-width:760px){.grid{grid-template-columns:1fr}header,main{padding:18px}.panel:first-child canvas{max-width:280px;margin:auto}.toolbar{gap:12px}}
+</style>
+<header><h1>推 / 拉 · 视频抽帧候选</h1><div class="meta">原视频 8441 · 24 fps 连续帧 · 384 × 320 透明画布 · 固定脚底基准 · 未接入关卡</div></header>
+<main>
+<div class="toolbar"><button id="replay" class="primary">重播两段</button><button id="pause">暂停</button><label>速度 <select id="speed"><option value="0.5">0.5×</option><option value="1" selected>1×</option><option value="1.5">1.5×</option></select></label><label><input id="guides" type="checkbox" checked>对齐线</label><label><input id="mirror" type="checkbox">朝左</label><label><input id="loop" type="checkbox">重复片段</label></div>
+<div class="grid">
+<section class="panel"><div class="caption"><h2>现有待机基准</h2><span class="status">同尺度</span></div><canvas id="idle" width="512" height="512"></canvas><p class="meta">当前游戏中的原角色素材</p></section>
+<section class="panel"><div class="caption"><h2>推：前倾蹬腿</h2><span class="status" id="push-state"></span></div><canvas id="push" width="512" height="512"></canvas><div class="controls"><button data-step="push,-1" title="上一帧">前一帧</button><span class="number" id="push-frame"></span><button data-step="push,1" title="下一帧">后一帧</button></div><input id="push-range" type="range" min="0" value="0" step="1"><p class="warning" id="push-note"></p></section>
+<section class="panel"><div class="caption"><h2>拉：后仰退步</h2><span class="status" id="pull-state"></span></div><canvas id="pull" width="512" height="512"></canvas><div class="controls"><button data-step="pull,-1">前一帧</button><span class="number" id="pull-frame"></span><button data-step="pull,1">后一帧</button></div><input id="pull-range" type="range" min="0" value="0" step="1"><p class="warning" id="pull-note"></p></section>
+</div>
+<footer><p>处理：绿幕抠图、统一缩放、固定地面、独立位移轨迹校准、拉动段去杆。未重画角色，未补造被裁掉的头盔，未倒放或删除动作内部帧。</p><p class="warning">这是素材验收，不是已完成的游戏状态切换。重复播放会暴露片段首尾的姿势差异，不代表无缝循环。</p><a href="manifest.json">帧号 / 时间 / 位移记录</a> · <a href="README.txt">处理说明</a> · <a href="pull_cycle.gif">拉循环候选</a></footer>
+</main>
+<script src="manifest.js"></script>
+<script>
+const M=window.MOTION_STUDY, players={}, $=id=>document.getElementById(id);
+let paused=false, speed=1, previous=performance.now(), ready=false;
+function load(src){return new Promise((resolve,reject)=>{const i=new Image;i.onload=()=>resolve(i);i.onerror=()=>reject(Error(src));i.src=src;});}
+function render(canvas,img){const [w,h]=M.canvas,[rx,ry]=M.root;if(canvas.width!==w){canvas.width=w;canvas.height=h;canvas.style.aspectRatio=`${w}/${h}`;}const c=canvas.getContext('2d');c.clearRect(0,0,w,h);c.save();if($('guides').checked){c.lineWidth=.5;c.strokeStyle='#91998f';c.beginPath();c.moveTo(0,ry);c.lineTo(w,ry);c.moveTo(rx,0);c.lineTo(rx,h);c.stroke();}if($('mirror').checked){c.translate(rx*2,0);c.scale(-1,1);}if(img===idleImage)c.drawImage(img,rx-128,ry-232);else c.drawImage(img,0,0);c.restore();}
+function paint(){if(!ready)return;render($('idle'),idleImage);for(const [name,p] of Object.entries(players)){const f=Math.min(p.images.length-1,Math.floor(p.time*24));render($(name),p.images[f]);$(name+'-range').value=f;$(name+'-frame').textContent=`${f+1} / ${p.images.length} · 源帧 ${p.meta.start+f}`;$(name+'-state').textContent=f===p.images.length-1?'片段末帧':paused?'暂停':'播放中';}}
+let idleImage;
+async function init(){idleImage=await load('../../assets/art/actors/crooked_tower_seedance/idle/frame_00.png');for(const name of ['push','pull']){const meta=M.clips.find(c=>c.name===name);const images=await Promise.all(Array.from({length:meta.end-meta.start+1},(_,i)=>load(`${name}/frame_${String(i).padStart(3,'0')}.png`)));players[name]={meta,images,time:0};$(name+'-range').max=images.length-1;$(name+'-note').textContent=meta.note||'连续片段；循环接缝待验收。';$(name+'-range').oninput=e=>{paused=true;players[name].time=Number(e.target.value)/24;updatePause();paint();};}ready=true;previous=performance.now();paint();}
+function updatePause(){$('pause').textContent=paused?'播放':'暂停';}
+$('replay').onclick=()=>{for(const p of Object.values(players))p.time=0;paused=false;updatePause();paint();};$('pause').onclick=()=>{paused=!paused;updatePause();};$('speed').onchange=e=>speed=Number(e.target.value);for(const id of ['guides','mirror'])$(id).onchange=paint;
+for(const b of document.querySelectorAll('[data-step]'))b.onclick=()=>{const [name,d]=b.dataset.step.split(',');const p=players[name];if(!p)return;paused=true;p.time=Math.max(0,Math.min(p.images.length-1,Math.floor(p.time*24)+Number(d)))/24;updatePause();paint();};
+function tick(now){const dt=Math.min(.1,(now-previous)/1000);previous=now;if(ready&&!paused){for(const p of Object.values(players)){p.time+=dt*speed;if($('loop').checked&&p.time>=p.images.length/24+.7)p.time=0;else if(!$('loop').checked)p.time=Math.min(p.time,(p.images.length-1)/24);}paint();}requestAnimationFrame(tick);}init().catch(e=>{$('push-note').textContent='素材加载失败：'+e.message;});requestAnimationFrame(tick);
+</script>
+</html>

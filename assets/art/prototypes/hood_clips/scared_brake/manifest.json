@@ -1,0 +1,26 @@
+{
+  "name": "scared_brake",
+  "frames": 135,
+  "fps": 60.0,
+  "source_fps": 24.12,
+  "scale": 0.2736,
+  "root": [
+    128.0,
+    232.0
+  ],
+  "canvas": 256,
+  "source_root": [
+    466.1,
+    833.0
+  ],
+  "loop": false,
+  "source_frames": [
+    12,
+    36
+  ],
+  "note": "source frames 12..36 at 24fps, then 54..112 every 2nd frame at 24fps (2x the original speed; the original recovery was slow motion); the static hold 37..53 is cut",
+  "original_frames": 55,
+  "original_fps": 24.12,
+  "frame_factor": 2.4545454545454546,
+  "upsampled": true
+}

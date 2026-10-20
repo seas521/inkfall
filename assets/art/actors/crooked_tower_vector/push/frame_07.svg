@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="192" height="192" viewBox="0 0 192 192">
+<!-- push frame 07 | fixed canvas 192x192 | root 96,174 -->
+<g fill="#010203" stroke="#010203" stroke-linecap="round" stroke-linejoin="round">
+<path d="M 89.10 156.00 Q 94.18 165.79 103.79 171.79" fill="none" stroke-width="11"/>
+<path d="M 103.10 156.00 Q 97.48 164.79 87.42 171.79" fill="none" stroke-width="12"/>
+<path d="M 85.10 130.00 Q 101.34 137.72 122.10 141.00" fill="none" stroke-width="10"/>
+<g transform="rotate(13.87 96.10 142.00) scale(1.000 1.000)"><path d="M 81.10 119.00 L 76.10 135.00 L 80.10 155.00 L 85.10 164.00 L 93.10 160.00 L 100.10 166.00 L 108.10 160.00 L 113.10 154.00 L 115.10 134.00 L 110.10 119.00 Z"/></g>
+<path d="M 108.10 129.00 Q 118.90 132.56 123.10 132.00" fill="none" stroke-width="11"/>
+<circle cx="122.10" cy="141.00" r="5.8"/>
+<circle cx="123.10" cy="132.00" r="5.4"/>
+
+<g transform="rotate(4.16 100.67 79.00) scale(1.000 1.000)"><path d="M 51.67 32.00 L 90.67 41.00 L 90.67 50.00 L 103.67 48.00 L 103.67 38.00 L 118.67 42.00 L 118.67 51.00 L 136.67 57.00 L 137.67 87.00 L 124.67 90.00 L 133.67 97.00 L 130.67 114.00 L 117.67 118.00 L 106.67 111.00 L 65.67 115.00 L 52.67 95.00 L 56.67 69.00 Z"/></g>
+</g>
+<ellipse cx="121.17" cy="89.00" rx="6.80" ry="3.8" fill="#ffad42"/>
+<path d="M 118.67 99.00 Q 122.67 102.00 126.67 98.50" fill="none" stroke="#d7792d" stroke-width="2.5" stroke-linecap="round"/>
+</svg>

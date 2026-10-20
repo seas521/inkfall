@@ -1,0 +1,25 @@
+{
+  "name": "water_wade",
+  "frames": 37,
+  "fps": 60.0,
+  "source_fps": 24.06,
+  "scale": 0.528,
+  "root": [
+    192.0,
+    348.0
+  ],
+  "canvas": 384,
+  "source_root": [
+    456.8,
+    759.0
+  ],
+  "loop": true,
+  "source_frames": [
+    35,
+    49
+  ],
+  "original_frames": 15,
+  "original_fps": 24.06,
+  "frame_factor": 2.466666666666667,
+  "upsampled": true
+}

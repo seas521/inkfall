@@ -1,0 +1,44 @@
+{
+  "name": "small_jump_apex",
+  "frames": 8,
+  "fps": 60.0,
+  "source_fps": 24.06,
+  "scale": 0.528,
+  "root": [
+    192.0,
+    348.0
+  ],
+  "canvas": 384,
+  "source_root": [
+    456.8,
+    759.0
+  ],
+  "loop": false,
+  "source_frames": [
+    150,
+    153
+  ],
+  "hold_points": [
+    [
+      -47.89746382978724,
+      -97.68
+    ],
+    [
+      -47.91431489361702,
+      -97.09582978723404
+    ],
+    [
+      -47.88373333333335,
+      -97.94133333333332
+    ],
+    [
+      -47.98257391304349,
+      -99.12626086956521
+    ]
+  ],
+  "pinned_to_ground": true,
+  "original_frames": 4,
+  "original_fps": 24.06,
+  "frame_factor": 2.0,
+  "upsampled": true
+}

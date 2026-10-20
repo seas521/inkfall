@@ -1,0 +1,38 @@
+{
+  "name": "grip_engage",
+  "frames": 23,
+  "fps": 60.0,
+  "source_fps": 24.06,
+  "scale": 0.528,
+  "root": [
+    192.0,
+    348.0
+  ],
+  "canvas": 384,
+  "source_root": [
+    456.8,
+    759.0
+  ],
+  "loop": false,
+  "source_frames": [
+    20,
+    29
+  ],
+  "hand_offsets": [
+    -31.0,
+    -31.0,
+    -52.0,
+    -52.0,
+    -80.0,
+    -80.0,
+    -102.0,
+    -102.0,
+    -103.0,
+    -103.0
+  ],
+  "hand_offset": -80.0,
+  "original_frames": 10,
+  "original_fps": 24.06,
+  "frame_factor": 2.3,
+  "upsampled": true
+}

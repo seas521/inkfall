@@ -1,0 +1,26 @@
+{
+  "name": "stand_rise",
+  "frames": 13,
+  "fps": 60.0,
+  "source_fps": 24.06,
+  "scale": 0.528,
+  "root": [
+    192.0,
+    348.0
+  ],
+  "canvas": 384,
+  "source_root": [
+    456.8,
+    759.0
+  ],
+  "loop": false,
+  "source_frames": [
+    36,
+    38
+  ],
+  "pinned_to_ground": true,
+  "original_frames": 3,
+  "original_fps": 10.0,
+  "frame_factor": 4.333333333333333,
+  "upsampled": true
+}

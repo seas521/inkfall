@@ -1,0 +1,25 @@
+{
+  "name": "idle_left",
+  "frames": 70,
+  "fps": 60.0,
+  "source_fps": 24.06,
+  "scale": 0.2736,
+  "root": [
+    128.0,
+    232.0
+  ],
+  "canvas": 256,
+  "source_root": [
+    466.1,
+    833.0
+  ],
+  "loop": true,
+  "source_frames": [
+    226,
+    240
+  ],
+  "original_frames": 28,
+  "original_fps": 24.06,
+  "frame_factor": 2.5,
+  "upsampled": true
+}

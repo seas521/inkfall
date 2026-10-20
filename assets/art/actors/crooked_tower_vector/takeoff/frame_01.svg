@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="192" height="192" viewBox="0 0 192 192">
+<!-- takeoff frame 01 | fixed canvas 192x192 | root 96,174 -->
+<g fill="#010203" stroke="#010203" stroke-linecap="round" stroke-linejoin="round">
+<path d="M 85.74 157.70 Q 84.82 166.67 89.52 172.00" fill="none" stroke-width="11"/>
+<path d="M 99.74 157.70 Q 104.25 165.67 102.48 172.00" fill="none" stroke-width="12"/>
+<path d="M 81.74 131.70 Q 79.76 142.52 83.70 148.67" fill="none" stroke-width="10"/>
+<g transform="rotate(3.40 92.74 143.70) scale(1.059 0.896)"><path d="M 77.74 120.70 L 72.74 136.70 L 76.74 156.70 L 81.74 165.70 L 89.74 161.70 L 96.74 167.70 L 104.74 161.70 L 109.74 155.70 L 111.74 135.70 L 106.74 120.70 Z"/></g>
+<path d="M 104.74 130.70 Q 106.33 141.91 102.04 148.41" fill="none" stroke-width="11"/>
+<circle cx="83.70" cy="148.67" r="5.8"/>
+<circle cx="102.04" cy="148.41" r="5.4"/>
+
+<g transform="rotate(1.27 98.74 80.22) scale(1.059 0.896)"><path d="M 49.74 33.22 L 88.74 42.22 L 88.74 51.22 L 101.74 49.22 L 101.74 39.22 L 116.74 43.22 L 116.74 52.22 L 134.74 58.22 L 135.74 88.22 L 122.74 91.22 L 131.74 98.22 L 128.74 115.22 L 115.74 119.22 L 104.74 112.22 L 63.74 116.22 L 50.74 96.22 L 54.74 70.22 Z"/></g>
+</g>
+<ellipse cx="119.24" cy="90.22" rx="6.80" ry="3.8" fill="#ffad42"/>
+<path d="M 116.74 100.22 Q 120.74 103.22 124.74 99.72" fill="none" stroke="#d7792d" stroke-width="2.5" stroke-linecap="round"/>
+</svg>

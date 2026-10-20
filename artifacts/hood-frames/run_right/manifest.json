@@ -1,0 +1,21 @@
+{
+  "name": "run_right",
+  "frames": 30,
+  "fps": 24.06,
+  "source_fps": 24.06,
+  "scale": 0.2736,
+  "root": [
+    128.0,
+    232.0
+  ],
+  "canvas": 256,
+  "source_root": [
+    492.0,
+    833.0
+  ],
+  "loop": true,
+  "source_frames": [
+    44,
+    73
+  ]
+}

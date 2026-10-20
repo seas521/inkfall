@@ -1,0 +1,7 @@
+[gd_scene format=3 uid="uid://c61ma1nb4imbp"]
+
+[ext_resource type="Script" uid="uid://be5nrfc3tmuk6" path="res://scripts/main.gd" id="1_main"]
+
+[node name="Inkfall" type="Node2D" unique_id=1938454085]
+script = ExtResource("1_main")
+debug_start_level = 1

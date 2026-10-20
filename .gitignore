@@ -1,0 +1,13 @@
+.godot/
+*.tmp
+
+
+# macOS / Python
+.DS_Store
+__pycache__/
+*.pyc
+
+# local rollback copies and bulky generated captures (rebuild with the tools in scripts/tools)
+/backups/
+/artifacts/c-zone-*/
+/artifacts/gpt6_motion/

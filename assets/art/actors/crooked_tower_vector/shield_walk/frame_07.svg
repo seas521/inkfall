@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="192" height="192" viewBox="0 0 192 192">
+<!-- shield_walk frame 07 | fixed canvas 192x192 | root 96,174 -->
+<g fill="#010203" stroke="#010203" stroke-linecap="round" stroke-linejoin="round">
+<path d="M 87.74 156.22 Q 95.35 166.00 107.04 172.00" fill="none" stroke-width="11"/>
+<path d="M 101.74 156.22 Q 97.71 162.39 88.96 167.26" fill="none" stroke-width="12"/>
+<path d="M 83.74 130.22 Q 81.26 139.50 84.74 144.22" fill="none" stroke-width="10"/>
+<g transform="rotate(8.57 94.74 142.22) scale(1.030 0.956)"><path d="M 79.74 119.22 L 74.74 135.22 L 78.74 155.22 L 83.74 164.22 L 91.74 160.22 L 98.74 166.22 L 106.74 160.22 L 111.74 154.22 L 113.74 134.22 L 108.74 119.22 Z"/></g>
+<path d="M 106.74 129.22 Q 110.78 136.94 108.74 140.22" fill="none" stroke-width="11"/>
+<circle cx="84.74" cy="144.22" r="5.8"/>
+<circle cx="108.74" cy="140.22" r="5.4"/>
+<g transform="rotate(9.17 116.74 140.22)"><path d="M 104.74 120.22 Q 116.74 116.22 129.74 122.22 L 131.74 144.22 Q 124.74 156.22 116.74 162.22 Q 103.74 151.22 104.74 120.22 Z" fill="#010203"/></g>
+<g transform="rotate(2.72 100.00 78.74) scale(1.030 0.956)"><path d="M 51.00 31.74 L 90.00 40.74 L 90.00 49.74 L 103.00 47.74 L 103.00 37.74 L 118.00 41.74 L 118.00 50.74 L 136.00 56.74 L 137.00 86.74 L 124.00 89.74 L 133.00 96.74 L 130.00 113.74 L 117.00 117.74 L 106.00 110.74 L 65.00 114.74 L 52.00 94.74 L 56.00 68.74 Z"/></g>
+</g>
+<ellipse cx="120.50" cy="88.74" rx="6.80" ry="3.8" fill="#ffad42"/>
+<path d="M 118.00 98.74 Q 122.00 101.74 126.00 98.24" fill="none" stroke="#d7792d" stroke-width="2.5" stroke-linecap="round"/>
+</svg>

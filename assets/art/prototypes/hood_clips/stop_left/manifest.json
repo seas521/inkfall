@@ -1,0 +1,57 @@
+{
+  "name": "stop_left",
+  "frames": 36,
+  "fps": 60.0,
+  "source_fps": 24.06,
+  "scale": 0.2736,
+  "root": [
+    128.0,
+    232.0
+  ],
+  "canvas": 256,
+  "source_root": [
+    466.1,
+    833.0
+  ],
+  "loop": false,
+  "source_frames": [
+    208,
+    222
+  ],
+  "original_frames": 15,
+  "original_fps": 24.06,
+  "frame_factor": 2.4,
+  "upsampled": true,
+  "entry_from_run": [
+    0,
+    0,
+    0,
+    1,
+    2,
+    4,
+    5,
+    5,
+    0,
+    0,
+    1,
+    2,
+    5
+  ],
+  "exit_to_run": [
+    4,
+    4,
+    4,
+    5,
+    5,
+    6,
+    7,
+    8,
+    8,
+    8,
+    8,
+    8,
+    8,
+    8,
+    8
+  ]
+}

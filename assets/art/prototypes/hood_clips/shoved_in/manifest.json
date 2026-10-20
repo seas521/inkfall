@@ -1,0 +1,14 @@
+{
+  "name": "shoved_in",
+  "frames": 5,
+  "fps": 60.0,
+  "loop": false,
+  "canvas": 384,
+  "root": [
+    192.0,
+    348.0
+  ],
+  "frame_factor": 1.0,
+  "upsampled": true,
+  "hand_offset": -65.0
+}
