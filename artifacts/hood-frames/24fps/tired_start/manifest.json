@@ -1,6 +1,6 @@
 {
   "name": "tired_start",
-  "frames": 29,
+  "frames": 24,
   "fps": 24.0,
   "source_fps": 24.12,
   "scale": 0.528,
@@ -15,8 +15,8 @@
   ],
   "loop": false,
   "source_frames": [
-    22,
-    50
+    12,
+    35
   ],
   "pinned_to_ground": false
 }

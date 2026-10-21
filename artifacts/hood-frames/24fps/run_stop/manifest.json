@@ -1,8 +1,8 @@
 {
   "name": "run_stop",
-  "frames": 31,
+  "frames": 15,
   "fps": 24.0,
-  "source_fps": 24.15,
+  "source_fps": 24.12,
   "scale": 0.528,
   "root": [
     192.0,
@@ -15,8 +15,8 @@
   ],
   "loop": false,
   "source_frames": [
-    42,
-    72
+    92,
+    106
   ],
   "pinned_to_ground": false
 }

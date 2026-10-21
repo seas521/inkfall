@@ -1,6 +1,6 @@
 {
   "name": "clumsy_run_rise",
-  "frames": 3,
+  "frames": 9,
   "fps": 24.0,
   "source_fps": 24.15,
   "scale": 0.528,
@@ -10,13 +10,13 @@
   ],
   "canvas": 384,
   "source_root": [
-    456.8,
+    445.2,
     759.0
   ],
   "loop": false,
   "source_frames": [
-    54,
-    57
+    39,
+    47
   ],
   "pinned_to_ground": true
 }

@@ -1,6 +1,6 @@
 {
   "name": "tired_run",
-  "frames": 28,
+  "frames": 18,
   "fps": 24.0,
   "source_fps": 24.12,
   "scale": 0.528,
@@ -15,8 +15,8 @@
   ],
   "loop": true,
   "source_frames": [
-    51,
-    78
+    35,
+    52
   ],
   "pinned_to_ground": false
 }

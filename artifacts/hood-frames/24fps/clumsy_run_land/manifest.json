@@ -1,6 +1,6 @@
 {
   "name": "clumsy_run_land",
-  "frames": 17,
+  "frames": 14,
   "fps": 24.0,
   "source_fps": 24.15,
   "scale": 0.528,
@@ -10,13 +10,13 @@
   ],
   "canvas": 384,
   "source_root": [
-    456.8,
+    445.2,
     759.0
   ],
   "loop": false,
   "source_frames": [
-    65,
-    84
+    59,
+    72
   ],
   "pinned_to_ground": false
 }

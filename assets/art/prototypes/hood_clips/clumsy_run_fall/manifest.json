@@ -1,6 +1,6 @@
 {
   "name": "clumsy_run_fall",
-  "frames": 6,
+  "frames": 11,
   "fps": 60.0,
   "source_fps": 24.15,
   "scale": 0.528,
@@ -10,17 +10,17 @@
   ],
   "canvas": 384,
   "source_root": [
-    456.8,
+    445.2,
     759.0
   ],
   "loop": false,
   "source_frames": [
-    62,
-    64
+    51,
+    58
   ],
   "pinned_to_ground": true,
-  "original_frames": 3,
+  "original_frames": 8,
   "original_fps": 24.0,
-  "frame_factor": 2.0,
+  "frame_factor": 1.375,
   "upsampled": true
 }
