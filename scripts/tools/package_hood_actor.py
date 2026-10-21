@@ -41,7 +41,7 @@ GROUPS = {
     "fan": ["fan_pickup", "fan_swing_1", "fan_swing_2", "fan_putdown"],
     "water": ["water_plunge", "water_tread", "water_swim", "water_drown", "water_wade"],
     "shove": ["shoved_in", "shoved", "shoved_out"],
-    "climb": ["climb"],
+    "climb": ["climb", "grab_bridge"],
 }
 ZONES = {
     "level1": ["core", "small", "fall"],

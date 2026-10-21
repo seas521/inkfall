@@ -87,14 +87,50 @@ func _run() -> void:
 	await _frames(40)
 	print("jump apex %.1f px" % apex)
 	_check(apex > 45.0 and apex <= 68.0, "a held jump rises about his own height (%.1f px, 76 px tall on screen)" % apex)
-	var x0: float = level.player.position.x
+	# a tap on the key (let go before he has even left the ground) is a short hop that is still a jump, not a twitch
+	level.player.velocity = Vector2.ZERO
+	await _frames(30)
+	var tap_start := _feet().y
+	var tap_apex := 0.0
+	Input.action_press("jump")
+	for i in 3:
+		await physics_frame
+	Input.action_release("jump")
+	for i in 80:
+		await physics_frame
+		tap_apex = maxf(tap_apex, tap_start - _feet().y)
+	print("tap apex %.1f px" % tap_apex)
+	_check(tap_apex >= 30.0 and tap_apex <= 52.0, "a tap on the key hops %.1f px (a full jump is about 65)" % tap_apex)
+	await _frames(40)
 	Input.action_press("move_right")
+	await _frames(40)  # picks up speed first (HOOD_START_ACCEL)
+	var x0: float = level.player.position.x
 	await _frames(60)
 	var speed: float = (level.player.position.x - x0) / 1.0
 	Input.action_release("move_right")
-	_check(speed > 120.0 and speed < 175.0, "he runs slowly (%.0f px/s)" % speed)
+	_check(speed > 120.0 and speed < 150.0, "he runs slowly (%.0f px/s)" % speed)
 	await _frames(30)
 
+	# a jump on the move gathers for a moment and uses the RUNNING set (the old speed test never did)
+	level.player.position = Vector2(6500.0, floor_y - 54.0)
+	level.player.velocity = Vector2.ZERO
+	await _frames(20)
+	Input.action_press("move_right")
+	await _frames(70)
+	var seen := {}
+	var gathered_on_ground := false
+	Input.action_press("jump")
+	for i in 60:
+		await physics_frame
+		seen[String(level.actor.current_clip)] = true
+		if level.actor.current_clip == &"clumsy_run_takeoff" and level.player.is_on_floor():
+			gathered_on_ground = true
+		if i == 8:
+			Input.action_release("jump")
+	Input.action_release("move_right")
+	_check(seen.has("clumsy_run_takeoff") and seen.has("clumsy_run_rise") and not seen.has("clumsy_stand_takeoff"), "a jump on the move uses the running clips (%s)" % [seen.keys()])
+	_check(gathered_on_ground, "he gathers on the ground before he leaves it")
+	await _frames(60)
 	# a wall 90 px high: far more than a jump
 	var wall := _block(Rect2(6700.0, floor_y - 90.0, 90.0, 90.0))
 	level.player.position = Vector2(6560.0, floor_y - 54.0)
@@ -190,7 +226,7 @@ func _run() -> void:
 	level.player.position = Vector2(6580.0, floor_y - 54.0)
 	level.player.velocity = Vector2.ZERO
 	await _frames(20)
-	await _run_and_jump(6700.0, 36.0)
+	await _run_and_jump(6700.0, 50.0)
 	grabbed = false
 	for i in 80:
 		await physics_frame
@@ -225,10 +261,10 @@ func _run() -> void:
 	# the box, pushed under the root platform (86 px above it)
 	level.puzzle_box.position = Vector2(3150.0, ledge_y - 94.0)
 	level.puzzle_box.velocity = Vector2.ZERO
-	level.player.position = Vector2(3215.0, ledge_y - 94.0 - 54.0)
+	level.player.position = Vector2(3190.0, ledge_y - 94.0 - 54.0)
 	level.player.velocity = Vector2.ZERO
 	await _frames(20)
-	await _run_and_jump(3296.0, 30.0)
+	await _run_and_jump(3296.0, 46.0)
 	grabbed = false
 	for i in 80:
 		await physics_frame

@@ -11,6 +11,7 @@ RIFE between the last frame of part A and the idle picture itself (both feet-ali
 clip IS idle_left's frame, and the game can switch to the idle without any change on the screen.
 """
 import json
+import os
 import shutil
 import subprocess
 import sys
@@ -82,7 +83,7 @@ sil = [(255 - f[..., 3]).astype(np.uint8) for f in pair]
 eyes = [(255 - (np.clip(ru.eye_mask(f), 0, 1) * 255).astype(np.uint8)) for f in pair]
 with tempfile.TemporaryDirectory() as tmp:
     work = Path(tmp)
-    rife_dir = Path("/tmp/rife/rife-ncnn-vulkan-20221029-macos")
+    rife_dir = Path(os.path.expanduser("~/tools/rife-ncnn-vulkan-20221029-macos"))
     sil_out = ru.run_rife(rife_dir, sil, MORPH_FRAMES + 1, work, "sil")
     eye_out = ru.run_rife(rife_dir, eyes, MORPH_FRAMES + 1, work, "eye")
 morph = [ru.compose(sil_out[i], eye_out[i]) for i in range(1, MORPH_FRAMES + 1)]

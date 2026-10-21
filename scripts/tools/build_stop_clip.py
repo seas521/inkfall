@@ -13,6 +13,7 @@ Tables in the manifest: `entry_from_run` (a tired_run frame -> the first stop fr
 looks most like it) and `exit_to_run` (a stop frame -> the tired_run frame to continue from if he sets off again half way).
 """
 import json
+import os
 import shutil
 import subprocess
 import sys
@@ -28,7 +29,7 @@ import rife_upsample as ru  # noqa: E402
 import tempfile  # noqa: E402
 
 OUT = btc.OUT
-FIRST, LAST, FRAMES = 42, 72, 44
+FIRST, LAST, FRAMES = 42, 72, 44  # (overridable: build_stop_clip.py VIDEO FIRST LAST FRAMES)
 MORPH_FRAMES = 5
 ENTRY_FRAMES = 12
 
@@ -38,7 +39,10 @@ def alpha(path):
 
 
 def main():
+    global FIRST, LAST, FRAMES
     video = sys.argv[1]
+    if len(sys.argv) >= 5:
+        FIRST, LAST, FRAMES = int(sys.argv[2]), int(sys.argv[3]), int(sys.argv[4])
     shutil.rmtree(btc.PROJECT / "artifacts/hood-frames/24fps/run_stop", ignore_errors=True)
     btc.extract(video, "run_stop", FIRST, LAST, False, False, False)
     result = subprocess.run([sys.executable, str(btc.RIFE), "run_stop", "--frames", str(FRAMES)], capture_output=True, text=True)
@@ -57,7 +61,7 @@ def main():
     eyes = [(255 - (np.clip(ru.eye_mask(f), 0, 1) * 255).astype(np.uint8)) for f in pair]
     with tempfile.TemporaryDirectory() as tmp:
         work = Path(tmp)
-        rife_dir = Path("/tmp/rife/rife-ncnn-vulkan-20221029-macos")
+        rife_dir = Path(os.path.expanduser("~/tools/rife-ncnn-vulkan-20221029-macos"))
         sil_out = ru.run_rife(rife_dir, sil, MORPH_FRAMES + 1, work, "sil")
         eye_out = ru.run_rife(rife_dir, eyes, MORPH_FRAMES + 1, work, "eye")
     morph = [ru.compose(sil_out[i], eye_out[i]) for i in range(1, MORPH_FRAMES + 1)]
@@ -70,7 +74,8 @@ def main():
     manifest["loop"] = False
     (folder / "manifest.json").write_text(json.dumps(manifest, indent=2))
     # tables
-    run = [alpha(OUT / "tired_run" / ("frame_%03d.png" % i)) for i in range(74)]
+    run_count = len(list((OUT / "tired_run").glob("frame_*.png")))
+    run = [alpha(OUT / "tired_run" / ("frame_%03d.png" % i)) for i in range(run_count)]
     stop = [alpha(folder / ("frame_%03d.png" % i)) for i in range(total)]
     entry = [int(np.argmin([int((run[i] ^ stop[j]).sum()) for j in range(min(ENTRY_FRAMES, total))])) for i in range(len(run))]
     exit_index = [int(np.argmin([int((stop[j] ^ r).sum()) for r in run])) for j in range(total)]

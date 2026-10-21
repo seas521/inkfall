@@ -44,9 +44,9 @@ CLIPS = [
 ]
 
 
-def extract(video, name, first, last, loop, boomerang, pin):
+def extract(video, name, first, last, loop, boomerang, pin, root_x=456.8):
     command = [sys.executable, str(EXTRACT), video, "--name", name, "--out", str(OUT), "--start", str(first), "--end", str(last),
-               "--scale", "0.528", "--root-x", "456.8", "--ground-y", "759", "--key", "green", "--canvas", "384"]
+               "--scale", "0.528", "--root-x", str(root_x), "--ground-y", "759", "--key", "green", "--canvas", "384"]
     if loop:
         command.append("--loop")
     if boomerang:

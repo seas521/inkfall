@@ -93,7 +93,7 @@ func _run() -> void:
 		await _shot("04-shore-wide-%s" % ("left" if side > 0 else "right"), level.crate.position.x + level.CRATE_SIZE.x * 0.5, 1.0)
 		Input.action_release(input)
 		Input.action_release("interact")
-		await _frames(120)
+		await _frames(170)
 		_check(level.art.water_impacts.is_empty(), "impact spray and rings expire")
 	level.reset_all()
 	_check(level.art.water_impacts.is_empty() and not level.crate_wet and not level.player_wet, "reset clears all water contact history")

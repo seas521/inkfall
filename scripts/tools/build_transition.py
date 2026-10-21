@@ -10,6 +10,7 @@ the clips (silhouette and eye separately). The run loop then continues at `exit_
 """
 import argparse
 import json
+import os
 import shutil
 import subprocess
 import tempfile
@@ -20,7 +21,7 @@ from PIL import Image
 
 from rife_upsample import CLIPS, compose, eye_mask
 
-RIFE = Path("/tmp/rife/rife-ncnn-vulkan-20221029-macos")
+RIFE = Path(os.path.expanduser("~/tools/rife-ncnn-vulkan-20221029-macos"))
 
 
 def frames_of(name):

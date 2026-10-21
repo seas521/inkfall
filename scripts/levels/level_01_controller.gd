@@ -247,8 +247,11 @@ func debug_enter_cavern_demo() -> void:
 
 func leave() -> void:
 	game_context.run_speed_scale = 1.0
+	game_context.ground_accel = 2300.0
 	game_context.air_speed_scale = 1.0
 	game_context.jump_speed_scale = 1.0
+	game_context.jump_windup_total = 0.0
+	game_context.jump_windup_left = 0.0
 	surface_audio.deactivate()
 	visible = false
 
@@ -335,8 +338,10 @@ func physics_tick(delta: float) -> void:
 	elapsed += delta
 	var hood_speed := ActorStyleHost.style_override == ActorPoseState.STYLE_HOOD
 	game_context.run_speed_scale = ActorPoseState.HOOD_RUN_SPEED_SCALE if hood_speed else 1.0
+	game_context.ground_accel = ActorPoseState.HOOD_START_ACCEL if hood_speed else 2300.0
 	game_context.air_speed_scale = ActorPoseState.HOOD_AIR_SPEED_SCALE if hood_speed else 1.0
 	game_context.jump_speed_scale = ActorPoseState.HOOD_JUMP_SCALE if hood_speed else 1.0
+	game_context.jump_windup_total = ActorPoseState.HOOD_JUMP_WINDUP if hood_speed else 0.0
 	_update_curtain(delta)
 	_advance_actor_action(delta)
 	room_intro_time = maxf(0.0, room_intro_time - delta)
@@ -414,6 +419,7 @@ func presentation_state() -> Dictionary:
 		"equipment": ActorPoseState.EQUIPMENT_THROWABLE if has_throwable else ActorPoseState.EQUIPMENT_NONE,
 		"action": actor_action,
 		"action_progress": _actor_action_progress(),
+		"jump_windup": (1.0 - game_context.jump_windup_left / game_context.jump_windup_total) if (game_context.jump_windup_left > 0.0 and game_context.jump_windup_total > 0.0) else -1.0,
 		"aim_angle": throw_angle,
 		"effort": clampf(throw_hold_time, 0.0, 1.0),
 		"light_exposure": 0.38 if room == Room.SURFACE else 0.18,

@@ -227,6 +227,7 @@ var paused := false
 var intro_time := 0.0
 var coyote := 0.0
 var jump_buffer := 0.0
+var jump_windup_left := 0.0  # the hooded boy gathers for a jump on the ground for HOOD_JUMP_WINDUP before he leaves it
 var fan_cooldown := 0.0
 # The hooded boy's failures fade to black after his fall / drowning / knock-down has played, and the checkpoint fades in
 # (the previous actor cuts straight to the checkpoint).
@@ -599,6 +600,7 @@ func restore_checkpoint() -> void:
 	pickup_time = 0.0
 	coyote = 0.0
 	jump_buffer = 0.0
+	jump_windup_left = 0.0
 	facing = 1.0
 	camera_x = clampf(player.position.x - 540.0, 0.0, WORLD_WIDTH - 1280.0)
 	camera.position.x = camera_x + 640.0
@@ -709,12 +711,17 @@ func _physics_process(delta: float) -> void:
 		player.position = crate.position + CRATE_SIZE * 0.5 + rider_local.rotated(crate_tilt) - Vector2(13,54)
 	_update_rock_shove(delta, direction)
 	var impact_speed := player.velocity.y
+	climb_prev_velocity = player.velocity
 	_update_player(delta, direction, (crate.position.x - previous_crate.x) / delta)
 	if player.is_on_floor() or is_riding():
 		climb_floor_y = player.position.y + PLAYER_SIZE.y
 		climb_floor_on_raft = is_riding()
 	_try_begin_climb(direction)
 	_update_water_contact(delta, previous_lowest, previous_feet_y)
+	if floating:
+		art.raft_waves(crate.position.x + CRATE_SIZE.x * 0.5, CRATE_SIZE.x * 0.5, crate.velocity.x, sink_speed, rock_speed, delta)
+	elif player.is_on_floor() and player.position.y + PLAYER_SIZE.y > WATER_Y + 8.0 and absf(player.velocity.x) > 20.0 and player.position.x + 13.0 > 1156.0 and player.position.x + 13.0 < 2060.0:
+		art.wade_waves(player.position.x + 13.0, player.velocity.x, delta)
 	if floating and is_riding() and not riding:
 		sink_speed += clampf(impact_speed * 0.09, 14.0, 48.0)
 		var impact_offset := clampf((player.position.x + 13.0 - crate.position.x - CRATE_SIZE.x * 0.5) / (CRATE_SIZE.x * 0.5), -1.0, 1.0)
@@ -1169,7 +1176,7 @@ func _update_water_contact(delta: float, previous_lowest: float, previous_feet_y
 	var player_in_river := feet.x > 1156.0 and feet.x < 2060.0
 	if not player_wet and player_in_river and feet.y > WATER_Y + 2.0 and not is_riding():
 		player_wet = true
-		art.emit_water_impact(feet.x, maxf(0.0, (feet.y - previous_feet_y) / delta), 9.0, false)
+		art.emit_water_impact(feet.x, maxf(0.0, (feet.y - previous_feet_y) / delta), 16.0, true)
 	elif not player_in_river or feet.y < WATER_Y - 6.0:
 		player_wet = false
 
@@ -1217,6 +1224,8 @@ func _update_crate(delta: float, direction: float, riding: bool) -> void:
 	var angle_target := slope
 	if floating:
 		angle_target = float_direction * deg_to_rad(9.0) * exp(-float_time * 2.0) + sin(float_time * 1.5) * deg_to_rad(0.6) + load_rock
+		var swell_tilt: float = -atan(art.wave_slope_between(crate.position.x + 10.0, crate.position.x + CRATE_SIZE.x - 10.0))
+		angle_target += clampf(swell_tilt * 0.9, -deg_to_rad(5.0), deg_to_rad(5.0))
 	var previous_support := _shore_limit(crate_tilt)
 	crate_tilt = lerpf(crate_tilt, angle_target, 1.0 - exp(-delta * 5.0))
 	crate_shape.rotation = crate_tilt
@@ -1233,7 +1242,9 @@ func _update_crate(delta: float, direction: float, riding: bool) -> void:
 		if not pulling_back:
 			_release_grip()
 		var shore_limit := minf(_shore_limit(crate_tilt), _shore_limit(crate_tilt, crate.velocity.x * delta))
-		var target_y := minf(_unloaded_float_y() + load_sink + sin(clock * 1.8) * 1.3, shore_limit)
+		# the swell lifts and tips the raft a little (the water under it, not just the load, decides how it sits)
+		var raft_wave: float = art.wave_at(crate.position.x + CRATE_SIZE.x * 0.5)
+		var target_y := minf(_unloaded_float_y() + load_sink + sin(clock * 1.8) * 1.3 - raft_wave * 0.75, shore_limit)
 		crate.position.y = minf(crate.position.y, shore_limit)
 		crate.position.y = move_toward(crate.position.y, target_y, delta * 110.0)
 		crate.velocity.y = 0.0
@@ -1821,22 +1832,35 @@ func _update_player(delta: float, direction: float, crate_speed: float) -> void:
 		var box_speed := puzzle_box_motion / maxf(delta, 0.0001)
 		target = box_speed + clampf((puzzle_box_grip_target_x() - player.position.x) * 16.0, -105.0, 105.0)
 	if intro_time <= 0.0:
-		player.velocity.x = move_toward(player.velocity.x, target, delta * 1900.0)
+		var accel := 1900.0
+		if ActorStyleHost.style_override == Pose.STYLE_HOOD and grounded and direction != 0.0 and rock_shove_index < 0 and not dragging and not puzzle_box_dragging and not hang_player_on and not in_shallows \
+				and player.velocity.x * direction > -1.0 and absf(target) > absf(player.velocity.x):
+			accel = Pose.HOOD_START_ACCEL  # the first step shows before he is at speed (no sliding on the spot)
+		player.velocity.x = move_toward(player.velocity.x, target, delta * accel)
 	player.velocity.y = minf(850.0, player.velocity.y + 1500.0 * delta)
 	if rock_lock_time > 0.0 or cliff.locks_move():
 		jump_buffer = 0.0
-	if jump_buffer > 0.0 and coyote > 0.0:
-		if rock_shove_index >= 0:
-			# Slipping out of the shove: the boulder rolls on beneath for a moment.
-			rock_immune = 1.0
-			_end_rock_shove()
-		player.velocity.y = -595.0 * jump_scale
-		jump_buffer = 0.0
-		coyote = 0.0
-		dragging = false
-		puzzle_box_dragging = false
-	if not Input.is_action_pressed("jump") and player.velocity.y < -210.0 * jump_scale:
-		player.velocity.y = -210.0 * jump_scale
+	var hood_gathers := ActorStyleHost.style_override == Pose.STYLE_HOOD and grounded
+	if jump_buffer > 0.0 and coyote > 0.0 and jump_windup_left <= 0.0:
+		if hood_gathers:
+			# the jump gathers first (the video's crouch), the launch comes when it has run out; the controls stay live
+			jump_windup_left = Pose.HOOD_JUMP_WINDUP
+			jump_buffer = 0.0
+		else:
+			_launch_jump(jump_scale)
+	elif jump_windup_left > 0.0:
+		jump_windup_left -= delta
+		if coyote <= 0.0 or rock_lock_time > 0.0 or cliff.locks_move():
+			jump_windup_left = 0.0  # he left the ground (or was frozen) while gathering: no jump
+		elif jump_windup_left <= 0.0:
+			jump_windup_left = 0.0
+			_launch_jump(jump_scale)
+	# letting go early cuts the jump; for the hooded boy (whose jump gathers first) to a short hop that is still a jump (about 40 px)
+	var jump_cut := -210.0 * jump_scale
+	if ActorStyleHost.style_override == Pose.STYLE_HOOD:
+		jump_cut = -595.0 * jump_scale * Pose.HOOD_JUMP_CUT
+	if not Input.is_action_pressed("jump") and player.velocity.y < jump_cut:
+		player.velocity.y = jump_cut
 	player.move_and_slide()
 	player.position.x = clampf(player.position.x, 20.0, WORLD_WIDTH - 55.0)
 
@@ -1863,6 +1887,13 @@ var climb_side := 1.0
 var climb_from_feet := Vector2.ZERO
 var climb_end_feet := Vector2.ZERO
 var climb_cooldown := 0.0
+var climb_bridge_left := 0.0  # the bridge frames (air pose -> the reach) still to show
+var climb_bridge_total := 0.0
+var climb_bridge_start := 0
+var climb_prev_velocity := Vector2.ZERO  # his velocity as the frame began: what he carries into the grab
+var climb_v0 := Vector2.ZERO
+var climb_lead_start := 0  # the frame of the reach he starts from (see _try_begin_climb)
+var climb_start_t := 0.0
 var climb_land_grace := 0.0  # the body has not found the floor yet on the first frames after the climb: still standing
 var climb_floor_on_raft := false
 var climb_floor_y := 0.0  # the feet of the last floor he stood on: a ledge a jump reaches is not climbed
@@ -1875,11 +1906,47 @@ func _climb_point(clip_point: Array) -> Vector2:
 	var k := _climb_scale()
 	return climb_corner + Vector2(climb_side * -float(clip_point[0]) * k, float(clip_point[1]) * k)
 
+# Where the clip's feet are in the world at this moment of the lead-in (the lead-in is rooted at the corner)
+func _climb_clip_feet(frame: float) -> Vector2:
+	var data: Dictionary = HoodManifest.CLIPS["climb"]
+	var lead_feet: Array = data.get("lead_feet", [])
+	if lead_feet.is_empty():
+		return _climb_point(data["start_feet"])
+	var clamped := clampf(frame, 0.0, float(lead_feet.size() - 1))
+	var low := int(floor(clamped))
+	var high := mini(low + 1, lead_feet.size() - 1)
+	var mix := clamped - float(low)
+	var a: Array = lead_feet[low]
+	var b: Array = lead_feet[high]
+	return _climb_point([lerpf(float(a[0]), float(b[0]), mix), lerpf(float(a[1]), float(b[1]), mix)])
+
+# His feet while he takes hold: they carry on with the speed he came with and settle into the hanging place (a Hermite curve with
+# the incoming velocity at the start and none at the end; an ease that starts from rest was a dead stop in mid-air), then the
+# climb carries him up to where he stands.
+func _climb_feet() -> Vector2:
+	var data: Dictionary = HoodManifest.CLIPS["climb"]
+	var hang := _climb_clip_feet(float(data.get("lead_frames", 0)))
+	var duration := maxf(climb_bridge_total + climb_snap - climb_start_t, 0.08)
+	if climb_time < climb_snap:
+		# the clock of the take-hold: the bridge first (the climb clock waits), then the rest of the reach
+		var elapsed := (climb_bridge_total - climb_bridge_left) + (climb_time - climb_start_t)
+		var s := clampf(elapsed / duration, 0.0, 1.0)
+		var h00 := 2.0 * s * s * s - 3.0 * s * s + 1.0
+		var h10 := s * s * s - 2.0 * s * s + s
+		var h01 := -2.0 * s * s * s + 3.0 * s * s
+		return climb_from_feet * h00 + climb_v0 * duration * h10 + hang * h01
+	var rest := maxf(climb_total - climb_snap, 0.1)
+	return hang.lerp(climb_end_feet, smoothstep(0.0, 1.0, (climb_time - climb_snap) / rest))
+
 func _climb_root() -> Vector2:
 	var data: Dictionary = HoodManifest.CLIPS["climb"]
-	var hang_feet := _climb_point(data["start_feet"])
-	var blend := smoothstep(0.0, 1.0, climb_time / climb_snap)
-	return climb_corner + (climb_from_feet - hang_feet) * (1.0 - blend)
+	var frame := climb_time / climb_total * float(int(data["frames"]) - 1)
+	if climb_bridge_left > 0.0:
+		return _climb_feet()  # the bridge frames are rooted at the feet like every clip
+	if climb_time >= climb_snap:
+		return climb_corner
+	# the displayed feet follow _climb_feet(); the clip's own feet movement is taken out, so the root is where the corner has to be
+	return climb_corner + (_climb_feet() - _climb_clip_feet(frame))
 
 func _climb_blocked(direction: float) -> bool:
 	if ActorStyleHost.style_override != Pose.STYLE_HOOD or hood_actor == null or not hood_actor.has_clip(&"climb"):
@@ -1994,15 +2061,40 @@ func _try_begin_climb(direction: float) -> bool:
 	var clip_data: Dictionary = HoodManifest.CLIPS["climb"]
 	climb_total = float(clip_data["frames"]) / float(clip_data["fps"])
 	climb_snap = float(clip_data["lead_frames"]) / float(clip_data["fps"])
-	climb_time = 0.0
+	# The reach starts from the frame that looks most like the air pose he is in (a table of the build: the jump clips and the climb
+	# come from different videos); the picture then carries on from that frame instead of cutting to the first one.
+	climb_lead_start = 0
+	climb_bridge_left = 0.0
+	climb_bridge_total = 0.0
+	var from_air: Dictionary = clip_data.get("from_air", {})
+	var air_clip := String(hood_actor.current_clip)
+	if from_air.has(air_clip):
+		var air_table: Array = from_air[air_clip]
+		climb_lead_start = int(air_table[clampi(hood_actor.current_frame_index, 0, air_table.size() - 1)])
+	# the bridge: in-between frames from the air frame he is in to the reach frame the climb carries on from (grab_bridge, a table of
+	# the build); without it (another clip, or no bridge clip) the climb starts straight from the matching frame
+	var bridge_data: Dictionary = HoodManifest.CLIPS.get("grab_bridge", {})
+	if bridge_data.has("bridge_start") and Dictionary(bridge_data["bridge_start"]).has(air_clip):
+		var starts: Array = bridge_data["bridge_start"][air_clip]
+		var leads: Array = bridge_data["bridge_lead"][air_clip]
+		var at := clampi(hood_actor.current_frame_index, 0, starts.size() - 1)
+		climb_bridge_start = int(starts[at])
+		climb_lead_start = int(leads[at])
+		climb_bridge_total = float(int(bridge_data["bridge_frames"])) / float(bridge_data["fps"])
+		climb_bridge_left = climb_bridge_total
+	climb_start_t = float(climb_lead_start) / float(int(clip_data["frames"]) - 1) * climb_total
+	climb_time = climb_start_t
+	climb_v0 = climb_prev_velocity.limit_length(260.0)
 	player.velocity = Vector2.ZERO
 	player.collision_mask = 0
 	jump_buffer = 0.0
+	jump_windup_left = 0.0
 	coyote = 0.0
 	return true
 
 func _end_climb(landed: bool) -> void:
 	climb_time = -1.0
+	climb_bridge_left = 0.0
 	climb_cooldown = 0.45
 	climb_land_grace = 0.15 if landed else 0.0
 	player.collision_mask = 11
@@ -2016,17 +2108,30 @@ func _end_climb(landed: bool) -> void:
 		player.position = end_feet - Vector2(13.0, 54.0)
 
 func _update_climb(delta: float) -> void:
-	climb_time += delta
+	if climb_bridge_left > 0.0:
+		climb_bridge_left = maxf(0.0, climb_bridge_left - delta)
+	else:
+		climb_time += delta
 	var direction := Input.get_axis("move_left", "move_right")
-	if climb_time < climb_snap + CLIMB_LET_GO_TIME and direction * climb_side < -0.5:
+	if climb_bridge_left <= 0.0 and climb_time < climb_snap + CLIMB_LET_GO_TIME and direction * climb_side < -0.5:
 		_end_climb(false)
 		return
 	if climb_time >= climb_total:
 		_end_climb(true)
 		return
-	var path := smoothstep(0.0, 1.0, climb_time / climb_total)
-	player.position = climb_from_feet.lerp(climb_end_feet, path) - Vector2(13.0, 54.0)
+	player.position = _climb_feet() - Vector2(13.0, 54.0)
 	player.velocity = Vector2.ZERO
+
+func _launch_jump(jump_scale: float) -> void:
+	if rock_shove_index >= 0:
+		# Slipping out of the shove: the boulder rolls on beneath for a moment.
+		rock_immune = 1.0
+		_end_rock_shove()
+	player.velocity.y = -595.0 * jump_scale
+	jump_buffer = 0.0
+	coyote = 0.0
+	dragging = false
+	puzzle_box_dragging = false
 
 func _present(delta: float) -> void:
 	# Collision can alternate vx between zero and walking speed. A cancelled
@@ -2113,6 +2218,8 @@ func _present(delta: float) -> void:
 		"aim_angle": cliff_pose.aim, "effort": cliff_pose.effort, "aiming": cliff.charging,
 		"monochrome": false, "visual_scale": ACTOR_VISUAL_SCALE,
 		"shoved": rock_shove_index >= 0, "alarm": rock_lock_time > 0.0,
+		"jump_windup": (1.0 - jump_windup_left / Pose.HOOD_JUMP_WINDUP) if jump_windup_left > 0.0 else -1.0,
+		"grab_frame": (climb_bridge_start + mini(int((1.0 - climb_bridge_left / climb_bridge_total) * float(int(HoodManifest.CLIPS["grab_bridge"]["bridge_frames"]))), int(HoodManifest.CLIPS["grab_bridge"]["bridge_frames"]) - 1)) if (climb_time >= 0.0 and climb_bridge_left > 0.0 and climb_bridge_total > 0.0) else -1,
 		# The ink stage softens every edge of the land by a pixel or two; the actor gets the same, so the
 		# character does not look cut out and pasted onto it.
 		"fog_blur": ACTOR_EDGE_SOFTNESS,
@@ -2266,7 +2373,7 @@ func _draw_ropes() -> void:
 		rope_art.draw_polyline(points, ROPE_INK, 2.8, true)
 		rope_art.draw_circle(free, 2.6, ROPE_INK)
 
-# F9 swaps the actor style at any time (the hooded boy or the previous character).
+# The actor is chosen by ActorStyleHost.style_override (the hooded boy; there is no key that switches it).
 # The previous actor shows a carried stone with the fan's one-hand art, so the cliff act calls it "fan". The hooded boy
 # draws the stone himself only while aiming and throwing; carried, picked up and put down, the cliff's own stone node
 # follows his hand.

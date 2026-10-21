@@ -19,6 +19,7 @@ canvas (384 x 480, root (192, 288)) because the standing idle is taller than the
 facing left; the game mirrors them) are in the manifest.
 """
 import json
+import os
 import shutil
 import subprocess
 import sys
@@ -59,7 +60,7 @@ def interpolate(images, out_count):
     eyes = [(255 - (np.clip(ru.eye_mask(f), 0, 1) * 255).astype(np.uint8)) for f in images]
     with tempfile.TemporaryDirectory() as tmp:
         work = Path(tmp)
-        rife_dir = Path("/tmp/rife/rife-ncnn-vulkan-20221029-macos")
+        rife_dir = Path(os.path.expanduser("~/tools/rife-ncnn-vulkan-20221029-macos"))
         sil_out = ru.run_rife(rife_dir, sil, out_count, work, "sil")
         eye_out = ru.run_rife(rife_dir, eyes, out_count, work, "eye")
     return [ru.compose(sil_out[i], eye_out[i]) for i in range(out_count)]

@@ -23,6 +23,26 @@ var surface: Node2D
 var water_volume: Polygon2D
 var water_impacts: Array[Dictionary] = []
 var water_impact_count := 0
+# The water surface is a row of columns (one every WAVE_DX px) that obeys a damped wave equation: whatever disturbs the water
+# (a body falling in, the raft's bow, a stroke of the drowning boy) pushes the columns, and the swell runs outwards, rocks the
+# raft and fades by itself. The shader draws it, the raft reads it (wave_at / wave_slope_between).
+const WAVE_X0 := 1100.0
+const WAVE_DX := 4.0
+const WAVE_N := 264
+const WAVE_SPEED := 150.0  # px/s: how fast a swell travels
+const WAVE_DAMP := 1.9  # 1/s: the swell loses about half its height every 0.75 s
+const WAVE_LEAK := 1.3  # 1/s
+const WAVE_MAX := 15.0  # px
+var wave_h := PackedFloat32Array()
+var wave_v := PackedFloat32Array()
+var wave_damp := PackedFloat32Array()
+var wave_kicks: Array[Dictionary] = []
+var wave_texture: ImageTexture
+var wave_energy := 0.0
+const WAKE_BOW := 1.1  # px/s of swell added per second per px/s of the raft's speed
+const HULL_PRESS := 1.5
+const HULL_TIP := 120.0
+const WADE_PUSH := 1.2
 var ground_dust: Array[Dictionary] = []
 var dust_layer: Node2D
 var dust_texture: GradientTexture2D
@@ -184,6 +204,10 @@ func _build_water_volume() -> void:
 	shader.code = """shader_type canvas_item;
 uniform sampler2D scene_color : hint_screen_texture, repeat_disable, filter_linear;
 uniform sampler2D bank_height : repeat_disable, filter_linear;
+uniform sampler2D waves : repeat_disable, filter_linear;
+uniform float wave_x0 = 1100.0;
+uniform float wave_dx = 4.0;
+uniform float wave_n = 264.0;
 uniform float water_y = 575.0;
 uniform float clock = 0.0;
 varying vec2 world_position;
@@ -191,7 +215,10 @@ void vertex() {
 	world_position = (MODEL_MATRIX * vec4(VERTEX, 0.0, 1.0)).xy;
 }
 void fragment() {
-	float wave = sin(world_position.x * 0.035 + clock * 1.6) * 0.55;
+	vec2 wave_uv = vec2(((world_position.x - wave_x0) / wave_dx + 0.5) / wave_n, 0.5);
+	float swell = texture(waves, wave_uv).r;
+	float swell_slope = (texture(waves, wave_uv + vec2(1.0 / wave_n, 0.0)).r - texture(waves, wave_uv - vec2(1.0 / wave_n, 0.0)).r) / (2.0 * wave_dx);
+	float wave = sin(world_position.x * 0.035 + clock * 1.6) * 0.55 - swell;
 	float depth = world_position.y - water_y - wave;
 	if (depth < 0.0) { discard; }
 	float bed = texture(bank_height,vec2(((world_position.x+120.0)/4.0+0.5)/706.0,0.5)).r * 1024.0;
@@ -201,7 +228,9 @@ void fragment() {
 	float distortion = sin(world_position.y * 0.14 + clock * 2.1) * 0.35;
 	distortion += sin(world_position.x * 0.07 - clock * 1.3) * 0.15;
 	distortion *= smoothstep(0.0,4.0,clearance);
-	vec2 refract_uv = SCREEN_UV + vec2(distortion, 0.0) * SCREEN_PIXEL_SIZE * smoothstep(0.0, 16.0, depth);
+	// a moving swell bends what is seen through it, most near the top
+	vec2 bend = vec2(distortion + swell_slope * 30.0 * exp(-depth / 40.0), swell_slope * 7.0 * exp(-depth / 25.0));
+	vec2 refract_uv = SCREEN_UV + bend * SCREEN_PIXEL_SIZE * smoothstep(0.0, 16.0, depth);
 	vec3 submerged = texture(scene_color, refract_uv).rgb;
 	// Retain sharp submerged silhouettes; no blur or rapid milky depth extinction.
 	float transmission = mix(0.90,0.60,smoothstep(0.0,12.0,depth));
@@ -212,16 +241,35 @@ void fragment() {
 	vec3 reflected = texture(scene_color,clamp(reflected_uv,vec2(0.0),vec2(1.0))).rgb;
 	water = mix(water,reflected,0.07*exp(-depth/65.0));
 	float surface_band = (1.0-smoothstep(0.0,2.4,depth)) * (0.08+0.03*sin(world_position.x*0.019+clock*0.6));
-	water = mix(water,vec3(0.63),surface_band);
+	surface_band *= 1.0 + abs(swell_slope) * 7.0 + abs(swell) * 0.12;
+	water = mix(water,vec3(0.63),clamp(surface_band,0.0,0.7));
+	// the faces of a swell catch the light just under the surface
+	float glint = clamp(abs(swell_slope) * 2.4, 0.0, 0.45) * (1.0 - smoothstep(0.0, 9.0, depth));
+	water += vec3(0.22) * glint;
 	COLOR = vec4(water,edge_aa);
 }"""
 	var material_value := ShaderMaterial.new()
 	material_value.shader = shader
 	material_value.set_shader_parameter("bank_height",ImageTexture.create_from_image(heights))
+	_init_waves()
+	material_value.set_shader_parameter("waves", wave_texture)
 	water_volume.material = material_value
 	add_child(water_volume)
 
+func _init_waves() -> void:
+	wave_h.resize(WAVE_N)
+	wave_v.resize(WAVE_N)
+	wave_damp.resize(WAVE_N)
+	for i in WAVE_N:
+		var x := WAVE_X0 + i * WAVE_DX
+		# the banks soak the swell up (it does not bounce back off the mud like off a wall)
+		var shore := minf(absf(x - 1156.0), absf(x - 2060.0))
+		var outside := 1.0 if (x < 1156.0 or x > 2060.0) else 0.0
+		wave_damp[i] = WAVE_DAMP + 5.0 * (1.0 - smoothstep(0.0, 70.0, shore)) + 8.0 * outside
+	wave_texture = ImageTexture.create_from_image(Image.create_from_data(WAVE_N, 1, false, Image.FORMAT_RF, wave_h.to_byte_array()))
+
 func reset_water_impacts() -> void:
+	_clear_waves()
 	water_impacts.clear()
 	ground_dust.clear()
 	gust_age = -1.0
@@ -229,6 +277,85 @@ func reset_water_impacts() -> void:
 	gust_ripples.clear()
 	dust_gap = 0.0
 	water_impact_count = 0
+
+func _clear_waves() -> void:
+	for i in wave_h.size():
+		wave_h[i] = 0.0
+		wave_v[i] = 0.0
+	wave_kicks.clear()
+	wave_energy = 0.0
+
+# Push the water at x: `impulse` is a speed in px/s (positive lifts it, negative presses it down), `width` the half width in px.
+func disturb(x: float, impulse: float, width: float) -> void:
+	if wave_v.is_empty():
+		return
+	var centre := (x - WAVE_X0) / WAVE_DX
+	var reach := int(ceil(width * 2.2 / WAVE_DX))
+	for i in range(maxi(1, int(centre) - reach), mini(WAVE_N - 1, int(centre) + reach + 1)):
+		var d := (float(i) - centre) * WAVE_DX / width
+		wave_v[i] += impulse * exp(-d * d)
+
+func disturb_later(x: float, impulse: float, width: float, delay: float) -> void:
+	wave_kicks.append({"x": x, "impulse": impulse, "width": width, "delay": delay})
+
+# The surface height at x in px (positive = above the still level), the swell only.
+func wave_at(x: float) -> float:
+	if wave_h.is_empty():
+		return 0.0
+	var f := clampf((x - WAVE_X0) / WAVE_DX, 0.0, WAVE_N - 1.001)
+	var i := int(f)
+	return lerpf(wave_h[i], wave_h[i + 1], f - float(i))
+
+func wave_slope_between(x0: float, x1: float) -> float:
+	if absf(x1 - x0) < 1.0:
+		return 0.0
+	return (wave_at(x1) - wave_at(x0)) / (x1 - x0)
+
+func _update_waves(delta: float) -> void:
+	if wave_h.is_empty():
+		return
+	for k in range(wave_kicks.size() - 1, -1, -1):
+		wave_kicks[k].delay = float(wave_kicks[k].delay) - delta
+		if float(wave_kicks[k].delay) <= 0.0:
+			disturb(float(wave_kicks[k].x), float(wave_kicks[k].impulse), float(wave_kicks[k].width))
+			wave_kicks.remove_at(k)
+	var steps := clampi(int(ceil(delta * 120.0)), 1, 5)
+	var dt := minf(delta, 0.05) / float(steps)
+	var c2 := WAVE_SPEED * WAVE_SPEED / (WAVE_DX * WAVE_DX)
+	var energy := 0.0
+	for step in steps:
+		for i in range(1, WAVE_N - 1):
+			var accel := c2 * (wave_h[i - 1] + wave_h[i + 1] - 2.0 * wave_h[i]) - wave_damp[i] * wave_v[i]
+			wave_v[i] += accel * dt
+		for i in range(1, WAVE_N - 1):
+			# (the water level also settles by itself: without this a displaced volume would only spread out, never go away)
+			wave_h[i] = clampf((wave_h[i] + wave_v[i] * dt) * (1.0 - WAVE_LEAK * dt), -WAVE_MAX, WAVE_MAX)
+	for i in WAVE_N:
+		energy += absf(wave_h[i])
+	wave_energy = energy
+	wave_texture.update(Image.create_from_data(WAVE_N, 1, false, Image.FORMAT_RF, wave_h.to_byte_array()))
+
+# The raft on the water, every frame: the bow pushes a swell ahead, the stern leaves a trough that follows, the hull sinking
+# (`press`, px/s downwards) or tipping (`tip`, rad/s) shoves the water under it outwards.
+func raft_waves(centre_x: float, half_width: float, vx: float, press: float, tip: float, delta: float) -> void:
+	var speed := absf(vx)
+	if speed > 3.0:
+		var dir := signf(vx)
+		disturb(centre_x + dir * half_width * 0.95, WAKE_BOW * speed * delta, 13.0)
+		disturb(centre_x - dir * half_width * 0.95, -WAKE_BOW * 0.6 * speed * delta, 15.0)
+	if absf(press) > 2.0:
+		disturb(centre_x, -press * HULL_PRESS * delta, half_width * 0.6)
+	if absf(tip) > 0.02:
+		disturb(centre_x + half_width * 0.8, tip * HULL_TIP * delta, 14.0)
+		disturb(centre_x - half_width * 0.8, -tip * HULL_TIP * delta, 14.0)
+
+# The boy wading: a little slap at his feet with every stride.
+func wade_waves(x: float, vx: float, delta: float) -> void:
+	disturb(x, -absf(vx) * WADE_PUSH * delta, 8.0)
+
+# Where the surface really is at x (the still level plus the swell): ripples, foam and the raft's waterline sit on it.
+func water_line(x: float) -> float:
+	return level.WATER_Y - wave_at(x)
 
 func _soft_texture() -> GradientTexture2D:
 	var gradient := Gradient.new()
@@ -404,7 +531,14 @@ func _draw_ground_dust() -> void:
 			dust_layer.draw_texture_rect(dust_texture, Rect2(Vector2(d.pos) - Vector2(size * 1.3, size) * 0.5, Vector2(size * 1.3, size)), false, Color(0.47, 0.47, 0.45, alpha))
 
 func emit_water_impact(x: float, speed: float, spread: float, rings: bool = true) -> void:
-	water_impacts.append({"x": x, "age": 0.0, "strength": clampf(0.42 + speed / 380.0, 0.42, 1.0), "spread": clampf(spread, 8.0, 52.0), "rings": rings})
+	var strength := clampf(0.42 + speed / 380.0, 0.42, 1.0)
+	water_impacts.append({"x": x, "age": 0.0, "strength": strength, "spread": clampf(spread, 8.0, 52.0), "rings": rings})
+	# the water is pressed down where it was hit, springs back as a short column a moment later, and the swell runs out both ways
+	var width := clampf(spread * 0.55 + 5.0, 8.0, 30.0)
+	var push := 30.0 + 66.0 * strength
+	disturb(x, -push, width)
+	disturb_later(x, push * 0.62, width * 0.7, 0.17)
+	disturb_later(x, -push * 0.28, width * 0.9, 0.42)
 	water_impact_count += 1
 	if water_impacts.size() > 8:
 		water_impacts.pop_front()
@@ -422,6 +556,9 @@ func emit_struggle_splash(x: float, side: float) -> void:
 			"shade": spray_rng.randf_range(0.48, 0.79),
 		})
 	water_impacts.append({"age": 0.0, "x": x, "drops": drops})
+	# every stroke of the drowning boy slaps the water and sets it rocking
+	disturb(x + side * 14.0, -46.0, 11.0)
+	disturb_later(x + side * 14.0, 30.0, 9.0, 0.12)
 	if water_impacts.size() > 8:
 		water_impacts.pop_front()
 
@@ -538,9 +675,10 @@ func sync(delta: float, new_camera: float, active: bool) -> void:
 	crate_art.rotation = level.crate_tilt
 	raft_front.transform = crate_art.transform
 	(water_volume.material as ShaderMaterial).set_shader_parameter("clock", clock)
+	_update_waves(delta)
 	for i in range(water_impacts.size() - 1, -1, -1):
 		water_impacts[i].age += delta
-		if water_impacts[i].age > 1.6:
+		if water_impacts[i].age > 2.4:
 			water_impacts.remove_at(i)
 	_update_ground_dust(delta)
 	dust_layer.queue_redraw()
@@ -723,12 +861,13 @@ func _draw_surface() -> void:
 		var span: Vector2 = level.crate_waterline_span()
 		var center := Vector2((span.x + span.y) * 0.5, level.WATER_Y)
 		for x in [span.x, span.y]:
-			surface.draw_line(Vector2(x-9.0,level.WATER_Y),Vector2(x+11.0,level.WATER_Y),Color(0.74,0.74,0.74,0.20),1.2,true)
+			surface.draw_line(Vector2(x-9.0,water_line(x-9.0)),Vector2(x+11.0,water_line(x+11.0)),Color(0.74,0.74,0.74,0.20),1.2,true)
 		for i in range(3):
 			var phase := fposmod(clock*0.65+i/3.0,1.0)
 			surface.draw_set_transform(Vector2(center.x,579.0),0.0,Vector2(1.0,0.13))
 			surface.draw_arc(Vector2.ZERO,level.CRATE_SIZE.x*0.5+phase*52.0,0,TAU,40,Color(0.74,0.74,0.74,(1.0-phase)*0.14),1.7,true)
 			surface.draw_set_transform(Vector2.ZERO)
+	_draw_swell_lines()
 	for impact in water_impacts:
 		_draw_water_impact(impact)
 	for ripple in gust_ripples:
@@ -741,13 +880,39 @@ func _draw_surface() -> void:
 		surface.draw_arc(Vector2.ZERO, spread * 0.55, 0.0, TAU, 28, Color(0.74, 0.74, 0.74, alpha * 0.7), 1.2, true)
 		surface.draw_set_transform(Vector2.ZERO)
 
+# The swell on the surface: a bright crest line that rides the water (brighter where it moves most) and two fainter lines under it
+# that follow it more gently, so the whole surface reads as rocking, not only the spray.
+func _draw_swell_lines() -> void:
+	if wave_energy < 0.6:
+		return
+	var from_x := maxf(WAVE_X0 + 8.0, camera_x - 20.0)
+	var to_x := minf(WAVE_X0 + (WAVE_N - 2) * WAVE_DX, camera_x + 1300.0)
+	if to_x <= from_x:
+		return
+	var x := from_x
+	var base_y: float = level.WATER_Y
+	while x < to_x:
+		var nx := x + WAVE_DX * 2.0
+		var h0 := wave_at(x)
+		var h1 := wave_at(nx)
+		var activity := clampf(maxf(absf(h0), absf(h1)) * 0.11 + absf(h1 - h0) * 0.16, 0.0, 1.0)
+		if activity > 0.03:
+			surface.draw_line(Vector2(x, base_y - h0 + 1.5), Vector2(nx, base_y - h1 + 1.5), Color(0.06, 0.06, 0.06, activity * 0.55), 2.6, true)
+			surface.draw_line(Vector2(x, base_y - h0), Vector2(nx, base_y - h1), Color(0.86, 0.86, 0.86, activity * 0.75), 1.5, true)
+			for k in 2:
+				var depth := 7.0 + k * 9.0
+				var echo0 := base_y + depth - h0 * (0.55 - 0.2 * k)
+				var echo1 := base_y + depth - h1 * (0.55 - 0.2 * k)
+				surface.draw_line(Vector2(x, echo0), Vector2(nx, echo1), Color(0.78, 0.78, 0.78, activity * (0.30 - 0.1 * k)), 1.1, true)
+		x = nx
+
 func _draw_water_impact(impact: Dictionary) -> void:
 	if impact.has("drops"):
 		_draw_struggle_splash(impact)
 		return
 	var t: float = impact.age
 	var strength: float = impact.strength
-	var origin := Vector2(impact.x, level.WATER_Y)
+	var origin := Vector2(impact.x, water_line(float(impact.x)))
 	# Short displaced-water lobes, then ballistic droplets and expanding ripples.
 	if t < 0.30:
 		var height := sin(t / 0.30 * PI) * 19.0 * strength
@@ -769,16 +934,19 @@ func _draw_water_impact(impact: Dictionary) -> void:
 		surface.draw_line(point,point-tail,Color(0.79,0.79,0.79,alpha),1.3,true)
 	if not impact.rings:
 		return
-	for i in 2:
-		var age := t - i * 0.12
-		if age < 0.0:
+	# rings run out and fade slowly (the harder the hit the farther and the longer)
+	var life := 1.3 + strength * 1.0
+	for i in 4:
+		var age := t - i * 0.16
+		if age < 0.0 or age > life:
 			continue
+		var fade := 1.0 - age / life
 		surface.draw_set_transform(origin + Vector2(0,2),0,Vector2(1,0.14))
-		surface.draw_arc(Vector2.ZERO,impact.spread+age*70.0,0,TAU,48,Color(0.70,0.70,0.70,maxf(0.0,1.0-age/1.6)*0.30),1.4,true)
+		surface.draw_arc(Vector2.ZERO,impact.spread+age*(62.0+strength*34.0),0,TAU,56,Color(0.70,0.70,0.70,fade*fade*(0.34-i*0.05)),1.5,true)
 		surface.draw_set_transform(Vector2.ZERO)
 
 func _draw_struggle_splash(impact: Dictionary) -> void:
-	var origin := Vector2(impact.x, level.WATER_Y)
+	var origin := Vector2(impact.x, water_line(float(impact.x)))
 	for drop in impact.drops:
 		var t: float = impact.age - drop.delay
 		if t < 0.0:

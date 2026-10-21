@@ -4,7 +4,7 @@
     /tmp/imgenv/bin/python scripts/tools/build_jump_clips.py STAND_JUMP_VIDEO RUN_JUMP_VIDEO
 
 STAND_JUMP_VIDEO (Seedance 8241): idle -> crouch -> low jump -> heavy landing -> back to the idle picture (last frame = idle_left).
-RUN_JUMP_VIDEO   (Seedance 7407): slow run -> hunch -> low jump -> heavy landing -> back to the run.
+RUN_JUMP_VIDEO   (Seedance 3158, the upright jog; the earlier 7407 was the hunched one): jog -> low jump -> heavy landing -> back to the jog.
 
 Rules: the videos have near-duplicate frames (every pose of the run jump is held on 1-2 frames in places), so duplicates are dropped
 before RIFE makes the 60 fps in-betweens (interpolating between doubles shows as stutter). The airborne clips (rise / apex / fall) are
@@ -27,6 +27,10 @@ sys.path.insert(0, str(TOOLS))
 import build_tired_clips as btc  # noqa: E402
 
 OUT = btc.OUT
+# the jog in the run-jump video sits about 6 canvas px (11.6 source px) off the jog of the run video: its root is shifted so that
+# both runs are on the same spot (compared by the centroid of the silhouettes)
+GATHER_START = 3
+ROOT_X = {"s": 456.8, "r": 456.8 - 11.6}
 # name, video (s: stand jump, r: run jump), first, last (source frames, 0-based), pin to ground, frames after RIFE, fps
 CLIPS = [
     ("clumsy_stand_takeoff", "s", 12, 29, False, 8, 64.0),
@@ -34,11 +38,12 @@ CLIPS = [
     ("clumsy_stand_apex", "s", 38, 41, True, 7, 60.0),
     ("clumsy_stand_fall", "s", 42, 45, True, 10, 60.0),
     ("clumsy_stand_land", "s", 46, 84, False, 40, 60.0),
-    ("clumsy_run_takeoff", "r", 44, 53, False, 8, 64.0),
-    ("clumsy_run_rise", "r", 54, 57, True, 12, 60.0),
-    ("clumsy_run_apex", "r", 58, 61, True, 7, 60.0),
-    ("clumsy_run_fall", "r", 62, 64, True, 8, 60.0),
-    ("clumsy_run_land", "r", 65, 84, False, 28, 60.0),
+    # the running jump (Seedance 3158: the new upright jog): no crouch in this one, the push-off is the last strides
+    ("clumsy_run_takeoff", "r", 31, 38, False, 8, 64.0),
+    ("clumsy_run_rise", "r", 39, 47, True, 14, 60.0),
+    ("clumsy_run_apex", "r", 48, 50, True, 7, 60.0),
+    ("clumsy_run_fall", "r", 51, 58, True, 12, 60.0),
+    ("clumsy_run_land", "r", 59, 72, False, 27, 60.0),
 ]
 
 
@@ -73,7 +78,7 @@ def main():
         if only is not None and name not in only:
             continue
         shutil.rmtree(btc.PROJECT / "artifacts/hood-frames/24fps" / name, ignore_errors=True)
-        btc.extract(videos[video], name, first, last, False, False, pin)
+        btc.extract(videos[video], name, first, last, False, False, pin, ROOT_X[video])
         before, after = dedupe(name)
         result = subprocess.run([sys.executable, str(btc.RIFE), name, "--frames", str(frames)], capture_output=True, text=True)
         print(result.stdout.strip() or result.stderr.strip()[-300:])
@@ -96,7 +101,9 @@ def run_tables():
     takeoff_path = OUT / "clumsy_run_takeoff" / "manifest.json"
     land_path = OUT / "clumsy_run_land" / "manifest.json"
     takeoff, land = masks("clumsy_run_takeoff"), masks("clumsy_run_land")
-    entry = [int(np.argmin([int((run[i] ^ t).sum()) for t in takeoff])) for i in range(len(run))]
+    # only the first GATHER_START frames are candidates: the jump gathers (the video's sink before the push-off), and a late match would
+    # skip the gather and show only the push-off
+    entry = [int(np.argmin([int((run[i] ^ t).sum()) for t in takeoff[:GATHER_START]])) for i in range(len(run))]
     exit_index = [int(np.argmin([int((l ^ r).sum()) for r in run])) for l in land]
     manifest = json.loads(takeoff_path.read_text())
     manifest["entry_from_run"] = entry

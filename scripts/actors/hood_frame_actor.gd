@@ -14,12 +14,18 @@ const SmallItemRenderer = preload("res://scripts/actors/small_item_renderer.gd")
 const Manifest = preload("res://scripts/actors/hood_actor_manifest.gd")
 
 const DISPLAY_SCALE := 0.42  # the same as the previous actor (a 200 px standing figure -> 84 px)
-# The tired run (Seedance 7549) is cut as a slow, heavy jog: one loop (two steps, 74 frames = 1.23 s) plays at 1.0x at
-# HOOD_RUN_SPEED (its own feet would move at about 130 px/s, so they slide a little). The carrying run (small_run_l1) was cut for 285 px/s.
-const HOOD_RUN_SPEED := 151.0
+# The run (Seedance 1427, an upright, weak jog): a 45 frame loop of two steps; as recorded (2.7 steps/s) its feet move at about 78 px/s. He runs
+# at HOOD_RUN_SPEED (135 px/s: 78, 100 and 115 were both too slow) and the loop plays 1.25x (HOOD_RUN_ANIM_SPEED is the speed at which it
+# plays 1.0x): 3.4 steps/s, the feet slide about 18%. The carrying run (small_run_l1) was cut for 285 px/s.
+const START_SKIP := 8  # frames of the start clip left out (60 fps): with the slower build-up (HOOD_START_ACCEL) the first foot plants when the speed is there
+const HOOD_RUN_SPEED := 135.0
+const HOOD_RUN_ANIM_SPEED := 108.0
 const CARRY_RUN_SPEED := 285.0
 # (There is no panting / bent-over rest any more: stopping from a run is just stopping. The stagger, panting and straightening-up
 # clips were cut: no stand-up could be joined to the idle without a jump.)
+# Above this speed a jump is a running jump (the run-up and landing clips of the run); his run is 78 px/s, so the old 120 never
+# applied: every jump on the move used the standing set.
+const RUN_AIR_SPEED := 45.0
 const BREATH_RAMP_TIME := 0.8
 const RUNNING_CLIPS := [&"tired_start", &"tired_run", &"small_run_l1"]
 const TAKEOFF_TIME := 0.125
@@ -35,7 +41,7 @@ const THROW_FROM := 8.0  # small_throw_release 8 -> 28 (0.34 s; the wind-up came
 const THROW_TO := 28.0
 const THROW_HAND_OVER_FRAME := 17  # the stone leaves the hand (the clip's own release frame)
 # Frames of the run loops where a foot comes down (read from the silhouettes' lowest point): the audio steps on these.
-const FOOT_CONTACTS := {&"tired_start": [24, 38, 52], &"tired_run": [2, 22, 39, 57], &"small_run_l1": [3, 15]}
+const FOOT_CONTACTS := {&"tired_start": [29, 50], &"tired_run": [16, 38], &"small_run_l1": [3, 15]}
 static var footstep_serial := 0  # grows by one on every foot-down while running; the surface audio follows it
 const KNOCKDOWN_STAGGER_SHARE := 0.6  # of the knock-down action: the stagger, then straight down onto the ground
 const KNOCKDOWN_STAGGER_FRAMES := 42  # fall_air after this turns into a flying dive, which is too airborne for a bat hit
@@ -64,6 +70,9 @@ var land_clip: StringName = &"clumsy_stand_land"
 var loco: StringName = &"idle"
 var run_time := 0.0
 var breath_ramp := 1.0
+var prev_windup := -1.0  # the gathering for a jump of the last frame (pose.jump_windup)
+var windup_set := "stand"
+var windup_from := 0
 var pending_from := 0
 var ghost: Sprite2D
 var ghost_time := 0.0
@@ -238,22 +247,35 @@ func sync_pose(delta: float, next_pose) -> void:
 		run_hold = RUN_HOLD_TIME
 	else:
 		run_hold = maxf(0.0, run_hold - dt)
+	# gathering for a jump on the ground (the controller's jump_windup runs 0 -> 1, then launches him): the takeoff clip is played by
+	# that progress, from the frame that looks most like the stride he is in; the rise clip follows at once when he leaves the ground
+	if pose.jump_windup >= 0.0 and pose.grounded and prev_windup < 0.0:
+		windup_set = "run" if absf(pose.velocity.x) > RUN_AIR_SPEED else "stand"
+		windup_from = 0
+		if windup_set == "run" and current_clip in [&"tired_run", &"tired_start"] and has_clip(&"clumsy_run_takeoff"):
+			var windup_entry: Array = Manifest.CLIPS["clumsy_run_takeoff"].get("entry_from_run", [])
+			if not windup_entry.is_empty() and current_clip == &"tired_run":
+				windup_from = int(windup_entry[clampi(current_frame_index, 0, windup_entry.size() - 1)])
 	if not on_ground and previous_grounded:
-		air_set = "run" if absf(pose.velocity.x) > 120.0 else "stand"
-		# a running jump starts from the frame of the run-up that looks most like the stride he is in (table from the build)
-		if air_set == "run" and current_clip == &"tired_run" and has_clip(&"clumsy_run_takeoff"):
-			var entry: Array = Manifest.CLIPS["clumsy_run_takeoff"].get("entry_from_run", [])
-			if not entry.is_empty():
-				pending_from = int(entry[clampi(current_frame_index, 0, entry.size() - 1)])
+		if prev_windup >= 0.0:
+			air_set = windup_set
+			takeoff_time = 0.0
+		else:
+			air_set = "run" if absf(pose.velocity.x) > RUN_AIR_SPEED else "stand"
+			# a running jump starts from the frame of the run-up that looks most like the stride he is in (table from the build)
+			if air_set == "run" and current_clip == &"tired_run" and has_clip(&"clumsy_run_takeoff"):
+				var entry: Array = Manifest.CLIPS["clumsy_run_takeoff"].get("entry_from_run", [])
+				if not entry.is_empty():
+					pending_from = int(entry[clampi(current_frame_index, 0, entry.size() - 1)])
+			takeoff_time = TAKEOFF_TIME
 		loco = &"idle"
-		takeoff_time = TAKEOFF_TIME
 		landing_time = 0.0
 	if on_ground and not previous_grounded:
 		# Run legs only if he is still running: otherwise the run-landing would run on the spot.
 		if _carrying() and has_clip(&"small_jump_land"):
 			land_clip = &"small_jump_land"
 		else:
-			land_clip = &"clumsy_run_land" if (air_set == "run" and absf(pose.velocity.x) > 60.0) else &"clumsy_stand_land"
+			land_clip = &"clumsy_run_land" if (air_set == "run" and absf(pose.velocity.x) > RUN_AIR_SPEED) else &"clumsy_stand_land"
 		landing_time = clip_duration(land_clip)
 		loco = &"run" if absf(pose.velocity.x) > 25.0 else &"idle"
 	takeoff_time = maxf(0.0, takeoff_time - dt)
@@ -289,7 +311,7 @@ func sync_pose(delta: float, next_pose) -> void:
 			play(wanted, pending_from)
 			pending_from = 0
 		if wanted == &"tired_run":
-			anim_speed = clampf(absf(pose.velocity.x) / HOOD_RUN_SPEED, 0.0, 1.5)
+			anim_speed = clampf(absf(pose.velocity.x) / HOOD_RUN_ANIM_SPEED, 0.0, 1.5)
 		elif wanted == &"small_run_l1":
 			anim_speed = absf(pose.velocity.x) / CARRY_RUN_SPEED
 		else:
@@ -330,10 +352,17 @@ func sync_pose(delta: float, next_pose) -> void:
 	body_lift = FALL_CENTRE if current_clip == &"fall_loop" else 0.0
 	_apply()
 	previous_action = pose.action
+	prev_windup = pose.jump_windup if pose.grounded else -1.0
 	previous_grounded = on_ground
 	previous_vertical_speed = pose.velocity.y
 
 func _action_frame() -> Dictionary:
+	# Gathering for a jump: the takeoff clip, by the controller's progress
+	if pose.jump_windup >= 0.0 and pose.grounded and pose.action == ActorPoseState.ACTION_NONE:
+		var gather_clip := StringName("clumsy_%s_takeoff" % windup_set)
+		if has_clip(gather_clip):
+			var gather_last := float(int(Manifest.CLIPS[String(gather_clip)]["frames"]) - 1)
+			return {"clip": gather_clip, "frame": lerpf(float(windup_from), gather_last, clampf(pose.jump_windup, 0.0, 1.0))}
 	# What the controller is doing to him (knock-down, getting up, a fall, a hit) decides the clip.
 	var progress_now := float(pose.action_progress)
 	match pose.action:
@@ -355,6 +384,8 @@ func _action_frame() -> Dictionary:
 		ActorPoseState.ACTION_HIT:
 			return {"clip": &"flinch", "progress": progress_now * 0.4}
 		ActorPoseState.ACTION_CLIMB:
+			if pose.grab_frame >= 0 and has_clip(&"grab_bridge"):
+				return {"clip": &"grab_bridge", "frame": float(pose.grab_frame)}
 			if has_clip(&"climb"):
 				return {"clip": &"climb", "progress": progress_now}
 		ActorPoseState.ACTION_PICKUP:
@@ -538,6 +569,7 @@ func _locomotion_clip() -> StringName:
 			run_time = 0.0
 			if moving:
 				loco = &"start"
+				pending_from = START_SKIP  # the first frames are only the weight shifting; the body is moving already
 				return &"tired_start"
 			return &"idle_left"
 		&"start":
@@ -597,7 +629,9 @@ func _blend_time(from_clip: StringName, to_clip: StringName) -> float:
 	if from_clip == &"tired_start" and to_clip == &"tired_run":
 		return 0.0
 	if from_clip == &"idle_left" and to_clip == &"tired_start":
-		return 0.0
+		return 0.06  # the start begins a few frames in
+	if from_clip == &"grab_bridge" or to_clip == &"grab_bridge":
+		return 0.0  # the bridge is made of in-between frames: nothing to hide
 	if (from_clip == &"climb" or from_clip == &"run_stop") and to_clip == &"idle_left":
 		return 0.0  # these clips end on the idle picture itself
 	if from_clip == &"tired_run" and to_clip == &"run_stop" or from_clip == &"run_stop" and to_clip == &"tired_run":

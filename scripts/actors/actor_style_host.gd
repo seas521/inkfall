@@ -8,10 +8,9 @@ const SeedanceFrameActor = preload("res://scripts/actors/seedance_frame_actor.gd
 const HoodFrameActor = preload("res://scripts/actors/hood_frame_actor.gd")
 
 # Which actor replaces the crooked-tower knight everywhere the controllers ask for it (they are not changed).
-# Empty = leave it. F9 toggles at run time; `-- --hood` on the command line or the project setting
-# inkfall/actor_style_override starts with the hooded boy.
-# The game starts with the hooded boy. Test scripts (run with --script) keep the previous actor unless they ask for him,
-# and `-- --legacy` starts the game with the previous character. F9 switches at any time (no on-screen message).
+# Empty = leave it. The game is the hooded boy: there is no key that switches the character any more (F9 used to). Test scripts
+# (run with --script) keep the previous actor unless they ask for him, and `-- --legacy` on the command line starts the game with
+# the previous character (for debugging only).
 static var style_override: StringName = ActorPoseState.STYLE_HOOD if not _running_a_script() else &""
 
 static func _running_a_script() -> bool:
@@ -59,12 +58,6 @@ func _ready() -> void:
 	style_toast.add_theme_constant_override("outline_size", 6)
 	style_toast.hide()
 	add_child(style_toast)
-
-func _unhandled_key_input(event: InputEvent) -> void:
-	var key := event as InputEventKey
-	if key != null and key.pressed and not key.echo and key.keycode == KEY_F9:
-		# switches silently: no message on the screen
-		style_override = &"" if style_override == ActorPoseState.STYLE_HOOD else ActorPoseState.STYLE_HOOD
 
 func present(delta: float, state: Dictionary) -> void:
 	pose.apply(state)

@@ -15,10 +15,11 @@ artifacts/hood-frames/24fps/<clip>. The manifest gets `frame_factor` (new frames
 The silhouette and the orange eye are interpolated as two separate masks (RIFE only does RGB), then put
 back together as pure black + orange eye on an alpha channel.
 
-RIFE binary: https://github.com/nihui/rife-ncnn-vulkan/releases (default path /tmp/rife/rife-ncnn-vulkan-20221029-macos).
+RIFE binary: https://github.com/nihui/rife-ncnn-vulkan/releases (default path ~/tools/rife-ncnn-vulkan-20221029-macos).
 """
 import argparse
 import json
+import os
 import shutil
 import subprocess
 import tempfile
@@ -143,7 +144,7 @@ def main():
     parser.add_argument("--fps", type=float, default=60.0)
     parser.add_argument("--frames", type=int, default=0, help="retime to exactly this many frames at --fps (one clip only)")
     parser.add_argument("--redo", action="store_true", help="start again from the saved 24fps frames")
-    parser.add_argument("--rife", default="/tmp/rife/rife-ncnn-vulkan-20221029-macos")
+    parser.add_argument("--rife", default=os.path.expanduser("~/tools/rife-ncnn-vulkan-20221029-macos"))
     args = parser.parse_args()
     for clip in args.clips:
         upsample(clip, args.fps, Path(args.rife), args.frames, args.redo)

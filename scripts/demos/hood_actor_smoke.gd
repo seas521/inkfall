@@ -82,7 +82,7 @@ func _run() -> void:
 	var steps: int = HoodFrameActor.footstep_serial - steps_before
 	_assert(steps >= 1 and steps <= 5, "a second of running gives a few foot-downs for the audio (%d)" % steps)
 	_assert(hood.current_clip == &"tired_run", "then the tired run loop (%s)" % hood.current_clip)
-	_assert(absf(hood.anim_speed - 1.0) < 0.15, "the run loop plays at 1.0x at his run speed, so his feet do not slide (%.3f)" % hood.anim_speed)
+	_assert(absf(hood.anim_speed - 135.0 / 108.0) < 0.08, "the run loop plays 1.25x at his run speed (a little faster than recorded: %.3f)" % hood.anim_speed)
 	Input.action_release("move_right")
 	await create_timer(0.15).timeout
 	# jump: takeoff, then the rise / apex / fall by vertical speed
@@ -91,9 +91,10 @@ func _run() -> void:
 	main.game_context.on_ground = true
 	await create_timer(0.1).timeout
 	Input.action_press("jump")
-	await create_timer(0.1).timeout
-	_assert(hood.current_clip == &"clumsy_stand_takeoff", "the jump starts with the takeoff clip (%s)" % hood.current_clip)
-	await create_timer(0.12).timeout  # real time: a headless frame is far shorter than a refresh
+	await create_timer(0.04).timeout  # real time: the gather lasts 0.09 s
+	_assert(hood.current_clip == &"clumsy_stand_takeoff", "the jump starts with the takeoff clip, gathered on the ground (%s)" % hood.current_clip)
+	_assert(main.game_context.on_ground, "he is still on the ground while he gathers")
+	await create_timer(0.16).timeout
 	Input.action_release("jump")
 	_assert(String(hood.current_clip) in ["clumsy_stand_rise", "clumsy_stand_apex"], "then rises (%s)" % hood.current_clip)
 	controller.player_position = home - Vector2(0.0, 150.0)
@@ -365,6 +366,35 @@ func _run() -> void:
 		short_actor.sync_pose(1.0 / 60.0, r)
 		wrong = wrong or short_actor.current_clip in [&"tired_run", &"tired_start"]
 	_assert(not wrong and short_actor.current_clip == &"idle_left", "stopping right after a running landing is a stop (%s)" % short_actor.current_clip)
+	# a jump gathers first: the takeoff clip by the controller's progress while he is still on the ground, then the rise clip at once
+	var jw = ActorPoseState.new()
+	jw.feet = home
+	jw.style_id = ActorPoseState.STYLE_HOOD
+	jw.facing = 1.0
+	jw.grounded = true
+	jw.velocity = Vector2(78.0, 0.0)
+	for i in 80:
+		short_actor.sync_pose(1.0 / 60.0, jw)
+	var frames_seen: Array = []
+	for i in 6:
+		jw.jump_windup = float(i) / 6.0
+		short_actor.sync_pose(1.0 / 60.0, jw)
+		frames_seen.append("%s:%d" % [short_actor.current_clip, short_actor.current_frame_index])
+	_assert(String(short_actor.current_clip) == "clumsy_run_takeoff", "gathering for a jump on the move shows the running takeoff (%s)" % [frames_seen])
+	jw.jump_windup = -1.0
+	jw.grounded = false
+	jw.velocity = Vector2(228.0, -430.0)
+	short_actor.sync_pose(1.0 / 60.0, jw)
+	_assert(String(short_actor.current_clip) == "clumsy_run_rise", "and the rise follows at once, the takeoff is not shown again (%s)" % short_actor.current_clip)
+	jw.grounded = true
+	jw.velocity = Vector2.ZERO
+	for i in 120:
+		short_actor.sync_pose(1.0 / 60.0, jw)
+	jw.jump_windup = 0.5
+	short_actor.sync_pose(1.0 / 60.0, jw)
+	_assert(String(short_actor.current_clip) == "clumsy_stand_takeoff", "standing still the gather is the standing takeoff (%s)" % short_actor.current_clip)
+	jw.jump_windup = -1.0
+	short_actor.sync_pose(1.0 / 60.0, jw)
 	# the end of a climb: the clip itself ends on the idle picture
 	var climb_pose = ActorPoseState.new()
 	climb_pose.feet = home
@@ -383,14 +413,14 @@ func _run() -> void:
 	short_actor.queue_free()
 	feel_actor.queue_free()
 	await _frames(1)
-	# the toggle goes back to the knight
+	# F9 no longer switches the character: the hooded boy stays
 	var key := InputEventKey.new()
 	key.keycode = KEY_F9
 	key.pressed = true
-	host._unhandled_key_input(key)
-	await create_timer(0.1).timeout
-	_assert(not host.style_toast.visible, "F9 switches without any message on the screen")
-	_assert(host.crooked_tower_actor.visible and not host.hood_actor.visible, "F9 switches back to the knight (hood %s, knight %s)" % [host.hood_actor.visible, host.crooked_tower_actor.visible])
+	if host.has_method("_unhandled_key_input"):
+		host._unhandled_key_input(key)
+	await create_timer(0.2).timeout
+	_assert(ActorStyleHost.style_override == ActorPoseState.STYLE_HOOD and host.hood_actor.visible and not host.crooked_tower_actor.visible, "F9 does nothing: the hooded boy stays (hood %s, knight %s)" % [host.hood_actor.visible, host.crooked_tower_actor.visible])
 	ActorStyleHost.style_override = &""
 	if failures.is_empty():
 		print("hood actor smoke OK")
