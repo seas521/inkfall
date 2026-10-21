@@ -2445,7 +2445,7 @@ func _act_finished() -> void:
 		_return_to_debug()
 
 func debug_enter_forest_act() -> void:
-	debug_return_index = 5
+	debug_return_index = 6
 	checkpoint = 5
 	checkpoint_fan = false
 	restore_checkpoint()

@@ -17,13 +17,14 @@ const INK := Palette.INK
 const PAPER := Palette.PAPER
 const MARSH_DEBUG_INDEX := 4
 const CLIFF_DEBUG_INDEX := 5
-const MAX_DEBUG_INDEX := 5
+const FOREST_DEBUG_INDEX := 6
+const MAX_DEBUG_INDEX := 6
 const DEBUG_RETURN_META := &"inkfall_debug_return"
 const RiverTransition = preload("res://scripts/levels/level01_river_transition.gd")
 const FilmLook = preload("res://scripts/effects/film_look.gd")
 
 @export_category("DEBUG")
-@export_enum("运行时关卡菜单", "1-01 · 墨坠井", "1-02 · 风化绳崖", "1-03 · 月炉木屋与根下旧矿", "原创场景 · 沉钟雾谷", "C区第二幕 · 枯枝瘴沼", "C区第三幕 · 断桥与升降梯")
+@export_enum("运行时关卡菜单", "1-01 · 墨坠井", "1-02 · 风化绳崖", "1-03 · 月炉木屋与根下旧矿", "原创场景 · 沉钟雾谷", "C区第二幕 · 枯枝瘴沼", "C区第三幕 · 断桥与升降梯", "C区第四幕 · 山坡与森林（爬绳）")
 var debug_start_level: int = 0
 
 var game_context = GameContext.new()
@@ -114,7 +115,7 @@ func _activate_level(index: int) -> void:
 	var controller_index := index
 	if index == 3:
 		controller_index = 3
-	elif index == MARSH_DEBUG_INDEX or index == CLIFF_DEBUG_INDEX:
+	elif index == MARSH_DEBUG_INDEX or index == CLIFF_DEBUG_INDEX or index == FOREST_DEBUG_INDEX:
 		controller_index = 0
 	active_controller = level_controllers[controller_index]
 	active_controller.enter(game_context, ui_font, self)
@@ -124,6 +125,9 @@ func _activate_level(index: int) -> void:
 	elif index == CLIFF_DEBUG_INDEX:
 		_mount_river(false)
 		river.debug_enter_cliff_act()
+	elif index == FOREST_DEBUG_INDEX:
+		_mount_river(false)
+		river.debug_enter_forest_act()
 	queue_redraw()
 
 func _begin_river_transition() -> void:
@@ -198,14 +202,14 @@ func _draw() -> void:
 func _draw_debug_selector() -> void:
 	draw_string(ui_font, Vector2(72.0, 92.0), "INKFALL · DEBUG", HORIZONTAL_ALIGNMENT_LEFT, -1.0, 30, INK)
 	draw_string(ui_font, Vector2(74.0, 128.0), "关卡测试入口", HORIZONTAL_ALIGNMENT_LEFT, -1.0, 16, Color(INK, 0.58))
-	var titles := ["DEBUG · 1-01 · 墨坠井", "DEBUG · 1-02 · 风化绳崖", "DEBUG · 1-03 · 月炉木屋与根下旧矿", "DEMO · 原创场景 · 沉钟雾谷", "DEBUG · C区第二幕 · 枯枝瘴沼", "DEBUG · C区第三幕 · 断桥与升降梯"]
-	var details := ["悬崖井口 → 火焰竖井 → 雾岸渡水 → 枯枝瘴沼", "双崖上层 → 滚石收绳 → 架绳攀爬 → 盾行山洞 → 对岸木屋", "木屋求救声 → 三相结界 → 坠入旧矿 → 绳索与十字镐 → 营救魔法师", "独立场景 → 多平面视差 → 电影景深 → 自由移动", "高台木箱 → 大树秋千 → 毒气石柱 → 落石与喷火", "投石砸断吊桥绳 → 过桥 → 带石上升降梯 → 砸断配重绳 → 升上悬崖"]
+	var titles := ["DEBUG · 1-01 · 墨坠井", "DEBUG · 1-02 · 风化绳崖", "DEBUG · 1-03 · 月炉木屋与根下旧矿", "DEMO · 原创场景 · 沉钟雾谷", "DEBUG · C区第二幕 · 枯枝瘴沼", "DEBUG · C区第三幕 · 断桥与升降梯", "DEBUG · C区第四幕 · 山坡与森林（爬绳）"]
+	var details := ["悬崖井口 → 火焰竖井 → 雾岸渡水 → 枯枝瘴沼", "双崖上层 → 滚石收绳 → 架绳攀爬 → 盾行山洞 → 对岸木屋", "木屋求救声 → 三相结界 → 坠入旧矿 → 绳索与十字镐 → 营救魔法师", "独立场景 → 多平面视差 → 电影景深 → 自由移动", "高台木箱 → 大树秋千 → 毒气石柱 → 落石与喷火", "投石砸断吊桥绳 → 过桥 → 带石上升降梯 → 砸断配重绳 → 升上悬崖", "升降梯之上的山坡 → 低垂的练习绳（跳起抓住，上下爬，左右摆，空格松手）"]
 	for index in titles.size():
-		var rect := Rect2(72.0, 145.0 + float(index) * 78.0, 1040.0, 68.0)
+		var rect := Rect2(72.0, 140.0 + float(index) * 70.0, 1040.0, 62.0)
 		var selected := index == debug_selection
 		draw_rect(rect, INK if selected else PAPER); draw_rect(rect, INK, false, 3.0)
 		draw_string(ui_font, rect.position + Vector2(32.0, 29.0), titles[index], HORIZONTAL_ALIGNMENT_LEFT, -1.0, 22, PAPER if selected else INK)
-		draw_string(ui_font, rect.position + Vector2(32.0, 55.0), details[index], HORIZONTAL_ALIGNMENT_LEFT, -1.0, 15, Color(PAPER, 0.7) if selected else Color(INK, 0.62))
+		draw_string(ui_font, rect.position + Vector2(32.0, 52.0), details[index], HORIZONTAL_ALIGNMENT_LEFT, -1.0, 15, Color(PAPER, 0.7) if selected else Color(INK, 0.62))
 	draw_string(ui_font, Vector2(74.0, 645.0), "↑ ↓ 选择　Enter / F 进入测试", HORIZONTAL_ALIGNMENT_LEFT, -1.0, 18, INK)
 	draw_string(ui_font, Vector2(74.0, 686.0), "游戏中按 Esc 返回 DEBUG", HORIZONTAL_ALIGNMENT_LEFT, -1.0, 15, Color(INK, 0.55))
 
