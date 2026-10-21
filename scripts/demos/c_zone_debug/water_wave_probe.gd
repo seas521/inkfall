@@ -29,7 +29,6 @@ func _series(label: String, seconds: float, driver: Callable = Callable()) -> vo
 	print(out)
 
 func _run() -> void:
-	ActorStyleHost.style_override = ActorPoseState.STYLE_HOOD  # the hooded boy (scripts keep the old actor unless told)
 	level = SCENE.instantiate()
 	root.add_child(level)
 	for i in 20:

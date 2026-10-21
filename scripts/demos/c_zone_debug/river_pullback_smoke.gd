@@ -38,7 +38,8 @@ func _run() -> void:
 	await _frames(4)
 	_check(level.can_grab(), "the floating raft can be gripped from the bank")
 	Input.action_press("interact")
-	await _frames(25)
+	Input.action_press("move_left")  # the hooded boy decides push or pull from the key after F: away from the raft is a pull
+	await _frames(70)
 	_check(level.dragging, "gripping a floating raft near the bank holds it")
 	Input.action_press("move_left")
 	await _until(func(): return level.crate.position.x < rest_x - 40.0, 260)

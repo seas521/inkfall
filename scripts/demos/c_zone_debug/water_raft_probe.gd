@@ -10,7 +10,6 @@ func _initialize() -> void:
 	call_deferred("_run")
 
 func _run() -> void:
-	ActorStyleHost.style_override = ActorPoseState.STYLE_HOOD
 	level = SCENE.instantiate()
 	root.add_child(level)
 	for i in 20:
@@ -38,5 +37,4 @@ func _run() -> void:
 	for r in rows:
 		print(r)
 	print("peak swell %.1f px" % peak_all)
-	ActorStyleHost.style_override = &""
 	quit()

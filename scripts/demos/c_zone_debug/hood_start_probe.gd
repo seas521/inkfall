@@ -9,7 +9,6 @@ func _initialize() -> void:
 	call_deferred("_run")
 
 func _run() -> void:
-	ActorStyleHost.style_override = ActorPoseState.STYLE_HOOD
 	var level = SCENE.instantiate()
 	root.add_child(level)
 	for i in 10:

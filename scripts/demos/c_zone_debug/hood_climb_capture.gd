@@ -26,7 +26,6 @@ func _shoot(label: String, zoom: float) -> void:
 
 func _run() -> void:
 	DisplayServer.window_set_size(Vector2i(1280, 720))
-	ActorStyleHost.style_override = ActorPoseState.STYLE_HOOD
 	level = SCENE.instantiate()
 	root.add_child(level)
 	await _frames(10)

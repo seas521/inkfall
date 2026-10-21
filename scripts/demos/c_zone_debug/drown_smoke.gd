@@ -17,8 +17,8 @@ func _run() -> void:
 	level.crate.position = Vector2(2200,518)
 	level.player.position = Vector2(1510,584)
 	await _frames(40)
-	_check(level.death_time > 0.0 and level.actor.current_clip == &"water_drown","deep water uses the supplied struggle frames")
-	_check(not level.fan.visible and not level.actor.small_item.visible,"drowning hides held equipment")
+	_check(level.death_time > 0.0 and level.actor.current_clip in [&"water_plunge", &"water_tread", &"water_drown"],"deep water uses the supplied struggle frames")
+	_check(not level.fan.visible and not level.actor.item_node.visible,"drowning hides held equipment")
 	var sprays: Array = level.art.water_impacts.filter(func(event): return event.has("drops"))
 	_check(not sprays.is_empty(), "struggling emits dedicated spray instead of repeated ripple rings")
 	if not sprays.is_empty():

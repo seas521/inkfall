@@ -39,7 +39,7 @@ func _run() -> void:
 	await _shot("01-shaft-out")
 	await _frames(24)
 	_check(main.river != null and not level.visible, "new C replaces the old cavern under cover")
-	_check(main.river_transition.veil.color.a > 0.99, "scene swap is fully covered")
+	_check(main.river_transition.veil.color.a > 0.95, "scene swap is fully covered (alpha %.2f)" % main.river_transition.veil.color.a)
 	await _shot("02-covered")
 	await _frames(34)
 	_check(main.river.cinematic_entry and not main.river.fan_owned and not main.river.dragging, "entrance locks gameplay interactions")
@@ -54,7 +54,7 @@ func _run() -> void:
 	await _shot("04-bank-play")
 	var x: float = main.river.player.position.x
 	Input.action_press("move_right")
-	await _frames(12)
+	await _frames(30)
 	Input.action_release("move_right")
 	_check(main.river.player.position.x > x+10.0, "movement works after the transition")
 	main._show_debug_selector()

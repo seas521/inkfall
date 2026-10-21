@@ -29,11 +29,10 @@ func _check(condition: bool, description: String) -> void:
 		print("FAIL: ", description)
 
 func _run() -> void:
-	ActorStyleHost.style_override = ActorPoseState.STYLE_HOOD
 	level = SCENE.instantiate()
 	root.add_child(level)
 	await _frames(100)
-	_check(level.actor == level.hood_actor and level.hood_actor.visible and not level.legacy_actor.visible, "the C zone shows the hooded boy")
+	_check(level.actor == level.hood_actor and level.hood_actor.visible, "the C zone shows the hooded boy")
 	_check(level.player.is_on_floor() and level.actor.current_clip in [&"idle_left"], "standing on the bank, after the walk in: idle or catching his breath (%s)" % level.actor.current_clip)
 	Input.action_press("move_right")
 	await _frames(30)
@@ -283,10 +282,5 @@ func _run() -> void:
 	_check(level.curtain_phase == 2 and level.death_time == 0.0, "the checkpoint is restored under the dark")
 	await _frames(70)
 	_check(level.curtain_phase == 0 and level._curtain_alpha() == 0.0, "and the screen fades back in")
-	# F9 goes back to the previous character
-	ActorStyleHost.style_override = &""
-	level.death_time = 0.0
-	await _frames(4)
-	_check(level.actor == level.legacy_actor and not level.hood_actor.visible, "switching the style gives back the previous character")
 	print("hood river smoke ", "OK" if failures == 0 else "FAILED: %d" % failures)
 	quit(0 if failures == 0 else 1)

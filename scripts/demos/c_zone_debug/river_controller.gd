@@ -1,21 +1,20 @@
 extends Node2D
 
 const Art = preload("res://scripts/demos/c_zone_debug/river_art.gd")
-const Actor = preload("res://scripts/demos/c_zone_debug/river_actor.gd")
 const HoodActor = preload("res://scripts/demos/c_zone_debug/hood_river_actor.gd")
 const ActorStyleHost = preload("res://scripts/actors/actor_style_host.gd")
 const ScreenIris = preload("res://scripts/shared/screen_iris.gd")
 const Pose = preload("res://scripts/actors/actor_pose_state.gd")
 const Fan = preload("res://scripts/demos/c_zone_debug/fan_art.gd")
-const Swing = preload("res://scripts/demos/c_zone_debug/fan_swing_manifest.gd")
 const Drown = preload("res://scripts/demos/c_zone_debug/drown_manifest.gd")
 const MarshArt = preload("res://scripts/demos/c_zone_debug/marsh_art.gd")
 const SmallItem = preload("res://scripts/actors/small_item_renderer.gd")
 const CliffAct = preload("res://scripts/demos/c_zone_debug/cliff_act.gd")
 const CliffArt = preload("res://scripts/demos/c_zone_debug/cliff_art.gd")
+const ForestAct = preload("res://scripts/demos/c_zone_debug/forest_act.gd")
 const HoodManifest = preload("res://scripts/actors/hood_actor_manifest.gd")
 
-const WORLD_WIDTH := 7520.0
+const WORLD_WIDTH := 15200.0
 const PLAYER_SIZE := Vector2(26, 54)
 const ACTOR_VISUAL_SCALE := 0.90
 const CRATE_SIZE := Vector2(144, 32)
@@ -191,12 +190,12 @@ var rock_push_cap := ROCK_SHOVE_SPEED
 var rock_resist := 0.0  # 0..1: how hard he is bracing against the stone
 var rock_speed := 0.0
 var actor: Node2D
-var legacy_actor: Node2D
 var hood_actor: Node2D
 var fan: Node2D
 var art: Node2D
 var marsh_art: Node2D
 var cliff: Node2D
+var forest: Node2D
 var stone_nodes: Array[Node2D] = []
 var stone_scales: Array[float] = []
 var fade_rect: ColorRect
@@ -247,7 +246,7 @@ var rope_side := 0.0  # which end of the boat the rope he holds is tied to
 var rope_art: Node2D
 var fan_warmup := 6
 var fan_swing := 0.0
-var fan_swing_total := Swing.DURATION
+var fan_swing_total := HOOD_FAN_SWING_TIME
 var fan_wind_delay := -1.0
 var pickup_total := FAN_HANDOFF_TIME
 var put_down_total := FAN_HANDOFF_TIME
@@ -318,6 +317,9 @@ func _ready() -> void:
 	cliff.level = self
 	cliff.finished_act.connect(_act_finished)
 	add_child(cliff)
+	forest = ForestAct.new()
+	forest.level = self
+	add_child(forest)
 	camera = Camera2D.new()
 	camera.position = Vector2(640, 360)
 	add_child(camera)
@@ -327,14 +329,10 @@ func _ready() -> void:
 	marsh_art = MarshArt.new()
 	marsh_art.level = self
 	add_child(marsh_art)
-	legacy_actor = Actor.new()
-	legacy_actor.z_index = 5
-	add_child(legacy_actor)
 	hood_actor = HoodActor.new()
 	hood_actor.z_index = 5
 	add_child(hood_actor)
-	hood_actor.hide()
-	actor = legacy_actor
+	actor = hood_actor
 	rope_art = Node2D.new()
 	rope_art.z_index = 4
 	rope_art.draw.connect(_draw_ropes)
@@ -509,7 +507,11 @@ func restore_checkpoint() -> void:
 		camera.position.y = 360.0
 	player.position = Vector2(590, 496)
 	crate.position = CRATE_START
-	if checkpoint == 1:
+	if checkpoint >= 5:
+		# Act four: the hillside above the lift.
+		player.position = Vector2(ForestAct.START_X + 60.0, ForestAct.FLOOR_Y - PLAYER_SIZE.y - 2.0)
+		crate.position = Vector2(RAFT_FLUSH_X, CRATE_START.y)
+	elif checkpoint == 1:
 		player.position = Vector2(1050, 496)
 		crate.position = Vector2(1100, CRATE_START.y)
 	elif checkpoint == 2 and marsh_save == 2:
@@ -545,6 +547,7 @@ func restore_checkpoint() -> void:
 	if checkpoint >= 3:
 		_clear_marsh_rocks()
 	cliff.reset(checkpoint >= 4)
+	forest.reset()
 	rock_first_delay = 0.6
 	fan_owned = checkpoint_fan
 	fan_revealed = true
@@ -604,6 +607,9 @@ func restore_checkpoint() -> void:
 	facing = 1.0
 	camera_x = clampf(player.position.x - 540.0, 0.0, WORLD_WIDTH - 1280.0)
 	camera.position.x = camera_x + 640.0
+	if checkpoint >= 5:
+		camera_y = minf(0.0, player.position.y - 300.0)
+		camera.position.y = 360.0 + camera_y
 	_present(0.0)
 
 func _unhandled_key_input(event: InputEvent) -> void:
@@ -643,6 +649,7 @@ func _physics_process(delta: float) -> void:
 	_update_swing()
 	_update_hang_deck(delta)
 	cliff.tick(delta)
+	forest.tick(delta)
 	_update_marsh_rocks(delta)
 	grip_time = maxf(0.0, grip_time - delta)
 	release_time = maxf(0.0, release_time - delta)
@@ -674,6 +681,11 @@ func _physics_process(delta: float) -> void:
 		_present(delta)
 		return
 	climb_cooldown = maxf(0.0, climb_cooldown - delta)
+	if forest.rope_attached():
+		forest.update_hold(delta, player)
+		_update_camera(delta)
+		_present(delta)
+		return
 	if climb_time >= 0.0:
 		_update_climb(delta)
 		_update_camera(delta)
@@ -717,6 +729,9 @@ func _physics_process(delta: float) -> void:
 		climb_floor_y = player.position.y + PLAYER_SIZE.y
 		climb_floor_on_raft = is_riding()
 	_try_begin_climb(direction)
+	if climb_time < 0.0 and forest.try_grab(player):
+		dragging = false
+		puzzle_box_dragging = false
 	_update_water_contact(delta, previous_lowest, previous_feet_y)
 	if floating:
 		art.raft_waves(crate.position.x + CRATE_SIZE.x * 0.5, CRATE_SIZE.x * 0.5, crate.velocity.x, sink_speed, rock_speed, delta)
@@ -881,7 +896,7 @@ func _fan_pickup_stand_x() -> float:
 	return fan_rest_position().x - fan_ground_facing * FAN_HANDLE_REACH
 
 func _fan_pickup_needs_walk() -> bool:
-	return ActorStyleHost.style_override == Pose.STYLE_HOOD and not fan_on_tree and (player.is_on_floor() or is_riding()) and absf(player.position.x + 13.0 - _fan_pickup_stand_x()) > 10.0
+	return not fan_on_tree and (player.is_on_floor() or is_riding()) and absf(player.position.x + 13.0 - _fan_pickup_stand_x()) > 10.0
 
 func _update_fan_walk(delta: float, direction: float) -> float:
 	if fan_walk_target == INF:
@@ -920,7 +935,7 @@ func can_pick_up_fan() -> bool:
 		return false
 	if fan_on_tree:
 		# his hand is up over his head when he reaches (the hooded boy jumps no higher than himself)
-		var reaching_hand := player.position+Vector2(13.0+facing*14.0,10.0 if ActorStyleHost.style_override == Pose.STYLE_HOOD else 28.0)
+		var reaching_hand := player.position+Vector2(13.0+facing*14.0,10.0)
 		return not player.is_on_floor() and not is_riding() and reaching_hand.distance_to(FAN_SPOT)<30.0
 	return (player.is_on_floor() or is_riding()) and (player.position+Vector2(13,54)).distance_to(fan_rest_position()) < 65.0
 
@@ -932,11 +947,8 @@ func _begin_grab() -> void:
 	grip_distance = 0.0
 	facing = signf(crate.position.x + CRATE_SIZE.x*0.5-player.position.x-13.0)
 
-# F beside the boat. The hooded boy waits for the direction; everyone else grips at once.
+# F beside the boat. He waits for the direction (towards the boat is a push, away from it a pull).
 func _request_grab() -> void:
-	if ActorStyleHost.style_override != Pose.STYLE_HOOD:
-		_begin_grab()
-		return
 	var direction := Input.get_axis("move_left", "move_right")
 	grip_pending = true
 	if direction != 0.0:
@@ -963,7 +975,7 @@ func _begin_put_down(grab_after: bool) -> bool:
 	else:
 		# Prefer the hand side, but never place the tool inside the hull or in deep water.
 		var found := false
-		for distance in ([FAN_HANDLE_REACH,-18.0,-38.0,38.0,-60.0,60.0] if ActorStyleHost.style_override == Pose.STYLE_HOOD else [18.0,-18.0,-38.0,38.0,-60.0,60.0]):
+		for distance in [FAN_HANDLE_REACH,-18.0,-38.0,38.0,-60.0,60.0]:
 			var x: float = clampf(feet.x+facing*distance,25.0,WORLD_WIDTH-25.0)
 			var y := ground_y(x)
 			if absf(feet.y-RACK_RECT.position.y)<4.0 and x>RACK_RECT.position.x+12.0 and x<RACK_RECT.end.x-12.0:
@@ -1064,27 +1076,19 @@ func _update_interaction(direction: float) -> void:
 func swing_fan() -> bool:
 	if not fan_owned or fan_cooldown > 0.0 or paused or dragging or puzzle_box_dragging or death_time > 0.0 or pickup_time > 0.0 or put_down_time > 0.0:
 		return false
-	var hood := ActorStyleHost.style_override == Pose.STYLE_HOOD
-	if not hood:
-		art.call("emit_gust", player.position + Vector2(13.0 + facing * 34.0, 14.0), facing)
-	fan_swing_total = HOOD_FAN_SWING_TIME if hood else Swing.DURATION
+	fan_swing_total = HOOD_FAN_SWING_TIME
 	fan_swing = fan_swing_total
 	fan_cooldown = fan_swing_total + 0.08
-	if hood:
-		fan_wind_delay = HOOD_FAN_WIND_DELAY
-		return _fan_wind_applies()
-	if _fan_wind_applies():
-		_apply_fan_wind()
-		return true
-	return false
+	fan_wind_delay = HOOD_FAN_WIND_DELAY
+	return _fan_wind_applies()
 
 func _fan_lock_time() -> float:
-	return HOOD_FAN_LOCK_TIME if ActorStyleHost.style_override == Pose.STYLE_HOOD else FAN_HANDOFF_TIME
+	return HOOD_FAN_LOCK_TIME
 
 func _fan_wind_applies() -> bool:
 	var offset := crate.position + CRATE_SIZE * 0.5 - (player.position + PLAYER_SIZE * 0.5)
 	var near := offset.length() < 240.0 and (offset.x * facing > -25.0 or is_riding())
-	if beached and ActorStyleHost.style_override == Pose.STYLE_HOOD:
+	if beached:
 		# a boat that has run up on the bank is blown back out into the water, if the wind blows away from the bank
 		return not launching and near and facing * bank_downhill_direction() > 0.0
 	return floating and not launching and not beached and _shore_limit(crate_tilt) > _unloaded_float_y() - 6.0 and near
@@ -1126,10 +1130,10 @@ var ride_drop := 0.0
 const HOOD_LOAD_SINK := 5.0
 
 func _float_raise() -> float:
-	return HOOD_FLOAT_RAISE if ActorStyleHost.style_override == Pose.STYLE_HOOD else 0.0
+	return HOOD_FLOAT_RAISE
 
 func _load_sink_target() -> float:
-	return HOOD_LOAD_SINK if ActorStyleHost.style_override == Pose.STYLE_HOOD else 11.0
+	return HOOD_LOAD_SINK
 
 func _unloaded_float_y() -> float:
 	return WATER_Y - 18.0 - _float_raise()
@@ -1810,11 +1814,8 @@ func _update_player(delta: float, direction: float, crate_speed: float) -> void:
 	jump_buffer = maxf(0.0, jump_buffer - delta)
 	if not cinematic_entry and Input.is_action_just_pressed("jump") and intro_time <= 0.0 and pickup_time <= 0.0 and put_down_time <= 0.0:
 		jump_buffer = 0.13
-	var speed := 285.0
-	var jump_scale := 1.0
-	if ActorStyleHost.style_override == Pose.STYLE_HOOD:
-		speed *= Pose.HOOD_RUN_SPEED_SCALE if grounded else Pose.HOOD_AIR_SPEED_SCALE
-		jump_scale = Pose.HOOD_JUMP_SCALE
+	var speed := 285.0 * (Pose.HOOD_RUN_SPEED_SCALE if grounded else Pose.HOOD_AIR_SPEED_SCALE)
+	var jump_scale := Pose.HOOD_JUMP_SCALE
 	var in_shallows := player.position.y + 54.0 > WATER_Y + 10.0
 	if in_shallows:
 		speed = 160.0
@@ -1833,14 +1834,14 @@ func _update_player(delta: float, direction: float, crate_speed: float) -> void:
 		target = box_speed + clampf((puzzle_box_grip_target_x() - player.position.x) * 16.0, -105.0, 105.0)
 	if intro_time <= 0.0:
 		var accel := 1900.0
-		if ActorStyleHost.style_override == Pose.STYLE_HOOD and grounded and direction != 0.0 and rock_shove_index < 0 and not dragging and not puzzle_box_dragging and not hang_player_on and not in_shallows \
+		if grounded and direction != 0.0 and rock_shove_index < 0 and not dragging and not puzzle_box_dragging and not hang_player_on and not in_shallows \
 				and player.velocity.x * direction > -1.0 and absf(target) > absf(player.velocity.x):
 			accel = Pose.HOOD_START_ACCEL  # the first step shows before he is at speed (no sliding on the spot)
 		player.velocity.x = move_toward(player.velocity.x, target, delta * accel)
 	player.velocity.y = minf(850.0, player.velocity.y + 1500.0 * delta)
 	if rock_lock_time > 0.0 or cliff.locks_move():
 		jump_buffer = 0.0
-	var hood_gathers := ActorStyleHost.style_override == Pose.STYLE_HOOD and grounded
+	var hood_gathers := grounded
 	if jump_buffer > 0.0 and coyote > 0.0 and jump_windup_left <= 0.0:
 		if hood_gathers:
 			# the jump gathers first (the video's crouch), the launch comes when it has run out; the controls stay live
@@ -1856,9 +1857,7 @@ func _update_player(delta: float, direction: float, crate_speed: float) -> void:
 			jump_windup_left = 0.0
 			_launch_jump(jump_scale)
 	# letting go early cuts the jump; for the hooded boy (whose jump gathers first) to a short hop that is still a jump (about 40 px)
-	var jump_cut := -210.0 * jump_scale
-	if ActorStyleHost.style_override == Pose.STYLE_HOOD:
-		jump_cut = -595.0 * jump_scale * Pose.HOOD_JUMP_CUT
+	var jump_cut := -595.0 * jump_scale * Pose.HOOD_JUMP_CUT
 	if not Input.is_action_pressed("jump") and player.velocity.y < jump_cut:
 		player.velocity.y = jump_cut
 	player.move_and_slide()
@@ -1949,7 +1948,7 @@ func _climb_root() -> Vector2:
 	return climb_corner + (_climb_feet() - _climb_clip_feet(frame))
 
 func _climb_blocked(direction: float) -> bool:
-	if ActorStyleHost.style_override != Pose.STYLE_HOOD or hood_actor == null or not hood_actor.has_clip(&"climb"):
+	if hood_actor == null or not hood_actor.has_clip(&"climb"):
 		return true
 	if climb_time >= 0.0 or climb_cooldown > 0.0 or intro_time > 0.0 or cinematic_entry:
 		return true
@@ -2138,7 +2137,6 @@ func _present(delta: float) -> void:
 	# release must not resume when the player touches the sliding crate again.
 	if release_time > 0.0 and (not player.is_on_floor() or absf(player.velocity.x) >= 30.0 or pickup_time > 0.0 or fan_swing > 0.0):
 		release_time = 0.0
-	_select_actor()
 	var action: StringName = Pose.ACTION_NONE
 	var progress := 0.0
 	var cliff_pose: Dictionary = cliff.pose_info()
@@ -2214,7 +2212,7 @@ func _present(delta: float) -> void:
 		"facing": facing, "action": action, "action_progress": progress,
 		"equipment": Pose.EQUIPMENT_THROWABLE if (fan_owned or cliff_pose.equipment == Pose.EQUIPMENT_THROWABLE) else Pose.EQUIPMENT_NONE,
 		"small_item_kind": &"fan" if fan_owned else (_cliff_item_kind(cliff_pose)),
-		"small_item_radius": CliffAct.STONE_VISUAL_RADIUS * HOOD_STONE_SCALE if ActorStyleHost.style_override == Pose.STYLE_HOOD else 11.0,
+		"small_item_radius": CliffAct.STONE_VISUAL_RADIUS * HOOD_STONE_SCALE,
 		"aim_angle": cliff_pose.aim, "effort": cliff_pose.effort, "aiming": cliff.charging,
 		"monochrome": false, "visual_scale": ACTOR_VISUAL_SCALE,
 		"shoved": rock_shove_index >= 0, "alarm": rock_lock_time > 0.0,
@@ -2234,7 +2232,16 @@ func _present(delta: float) -> void:
 	actor.set("squash", lerpf(1.0, 0.2, smoothstep(0.0, 0.12, marsh_hit_time)) if (marsh_hit_kind == "crush" and marsh_hit_time > 0.0) else 1.0)
 	actor.set("fan_ground_target", fan_rest_position())
 	actor.sync_pose(delta, pose)
-	if death_time > 0.0:
+	var hang: Dictionary = forest.hang_info()
+	if not hang.is_empty():
+		# Holding a rope (placeholder until the rope clips exist): the whole figure hangs from his hands along the rope.
+		actor.rotation = -float(hang.angle)
+		actor.position = Vector2(hang.hands) + Vector2(hang.direction) * 66.0
+	elif actor.rotation != 0.0:
+		actor.rotation = 0.0
+	if not hang.is_empty():
+		pass
+	elif death_time > 0.0:
 		var sink := smoothstep(Drown.STRUGGLE,Drown.DURATION,death_time)
 		var surface_y := WATER_Y + 26.0 + sin(death_time*8.0)*2.0*(1.0-sink)
 		actor.position.y = lerpf(pose.feet.y,surface_y,smoothstep(0.0,0.36,death_time)) + sink*76.0
@@ -2302,17 +2309,16 @@ const HOOD_BOAT_SPEED := 80.0
 const HOOD_BOX_SPEED := 70.0
 
 func _boat_speed() -> float:
-	return HOOD_BOAT_SPEED if ActorStyleHost.style_override == Pose.STYLE_HOOD else 126.0
+	return HOOD_BOAT_SPEED
 
 func _box_speed() -> float:
-	return HOOD_BOX_SPEED if ActorStyleHost.style_override == Pose.STYLE_HOOD else 108.0
+	return HOOD_BOX_SPEED
 
 func _grip_settled() -> bool:
 	return grip_time <= 0.0 and rope_stage != 1
 
 func _update_rope_mode(delta: float, direction: float) -> void:
-	var hood := ActorStyleHost.style_override == Pose.STYLE_HOOD
-	var active := hood and dragging and grip_is_crate
+	var active := dragging and grip_is_crate
 	if not active:
 		rope_stage = 0
 		rope_direct = false
@@ -2373,21 +2379,14 @@ func _draw_ropes() -> void:
 		rope_art.draw_polyline(points, ROPE_INK, 2.8, true)
 		rope_art.draw_circle(free, 2.6, ROPE_INK)
 
-# The actor is chosen by ActorStyleHost.style_override (the hooded boy; there is no key that switches it).
-# The previous actor shows a carried stone with the fan's one-hand art, so the cliff act calls it "fan". The hooded boy
-# draws the stone himself only while aiming and throwing; carried, picked up and put down, the cliff's own stone node
+# He draws the stone himself only while aiming and throwing; carried, picked up and put down, the cliff's own stone node
 # follows his hand.
 func _cliff_item_kind(cliff_pose: Dictionary) -> StringName:
-	if ActorStyleHost.style_override != Pose.STYLE_HOOD:
-		return cliff_pose.kind
 	if cliff_pose.action in [Pose.ACTION_THROW_CHARGE, Pose.ACTION_THROW_RELEASE]:
 		return &"ink_stone"
 	return &""
 
 func _fail_restore() -> void:
-	if ActorStyleHost.style_override != Pose.STYLE_HOOD:
-		restore_checkpoint()
-		return
 	if curtain_phase == 0:
 		curtain_phase = 1
 		curtain_time = 0.0
@@ -2411,16 +2410,6 @@ func _curtain_alpha() -> float:
 		return 1.0 - smoothstep(0.0, CURTAIN_OPEN, curtain_time)
 	return 0.0
 
-func _select_actor() -> void:
-	var wanted: Node2D = hood_actor if ActorStyleHost.style_override == Pose.STYLE_HOOD else legacy_actor
-	if wanted == actor:
-		return
-	actor.hide()
-	actor = wanted
-	actor.show()
-	actor.call("reset_grip_animation")
-	art.crate_art.queue_redraw()  # the raft has end posts for the hooded boy
-
 func _sync_stone_nodes() -> void:
 	for index in range(stone_nodes.size()):
 		var info: Dictionary = cliff.stone_state(index)
@@ -2431,7 +2420,7 @@ func _sync_stone_nodes() -> void:
 		var hidden: bool = state == CliffAct.Stone.THROWN_PENDING or (state == CliffAct.Stone.HELD and cliff.charging)
 		node.visible = not hidden and death_time <= 0.0 and not (in_hand and marsh_hit_time > 0.0)
 		node.position = info.position
-		if ActorStyleHost.style_override == Pose.STYLE_HOOD and state == CliffAct.Stone.STACKED:
+		if state == CliffAct.Stone.STACKED:
 			# drawn smaller, the three stones of the pile would stand apart: pull them in about the slab so they touch
 			var anchor: Vector2 = cliff.stack_pos(0) + Vector2(CliffAct.STONE_RADIUS * 1.25, 11.0)
 			node.position = anchor + (Vector2(info.position) - anchor) * HOOD_STONE_SCALE
@@ -2446,7 +2435,7 @@ func _sync_stone_nodes() -> void:
 		# A stone at rest is half sunk in the ground: behind the ink, so the ground's edge covers its foot.
 		node.z_index = 7 if in_hand else (0 if (state == CliffAct.Stone.REST or state == CliffAct.Stone.STACKED) else 4)
 		node.modulate.a = float(info.alpha)
-		stone_scales[index] = HOOD_STONE_SCALE if ActorStyleHost.style_override == Pose.STYLE_HOOD else 1.0
+		stone_scales[index] = HOOD_STONE_SCALE
 		node.scale = Vector2.ONE * stone_scales[index]
 
 # The lift has reached the cliff top and the screen has gone dark: hand over to the next scene.
@@ -2454,6 +2443,25 @@ func _act_finished() -> void:
 	completed = true
 	if return_to_debug_menu and not hosted_in_level:
 		_return_to_debug()
+
+func debug_enter_forest_act() -> void:
+	debug_return_index = 5
+	checkpoint = 5
+	checkpoint_fan = false
+	restore_checkpoint()
+	player.velocity = Vector2.ZERO
+	fan_owned = false
+	fan_on_tree = false
+	fan_revealed = false
+	landed = true
+	beached = true
+	floating = false
+	intro_time = 0.0
+	camera_x = clampf(player.position.x - 525.0, 0.0, WORLD_WIDTH - 1280.0)
+	camera.position.x = camera_x + 640.0
+	camera_y = minf(0.0, player.position.y - 300.0)
+	camera.position.y = 360.0 + camera_y
+	_present(0.0)
 
 func debug_enter_cliff_act() -> void:
 	debug_return_index = 5

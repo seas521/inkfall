@@ -47,16 +47,14 @@ func _run() -> void:
 	actor.queue_free()
 	await _frames(1)
 	# 3. the real level with the override: the controller is not touched, the host shows the hooded boy
-	ActorStyleHost.style_override = ActorPoseState.STYLE_HOOD
 	var main = MAIN_SCENE.instantiate()
 	main.debug_start_level = 1  # the project may be set to start in another act for play-testing
 	root.add_child(main)
 	await _frames(3)
 	var controller = main.active_controller
 	_assert(controller != null, "level controller started")
-	_assert(controller.presentation_state()["style_id"] == ActorPoseState.STYLE_CROOKED_TOWER, "the controller still asks for the knight")
 	var host = main.art_actor
-	_assert(host.hood_actor.visible and not host.crooked_tower_actor.visible, "the host shows the hooded boy instead")
+	_assert(host.hood_actor.visible, "the host shows the hooded boy")
 	var hood = host.hood_actor
 	await _frames(12)
 	var home: Vector2 = controller.player_position  # where the level puts him: standing on the ground
@@ -119,7 +117,6 @@ func _run() -> void:
 	_assert(controller.curtain_phase == 2 and controller.shaft_failure_kind == "", "and resets under the dark")
 	controller.call("_update_curtain", 0.9)
 	_assert(controller.curtain_phase == 0, "then fades back in")
-	_assert(ActorStyleHost._running_a_script(), "scripts keep the previous actor by default; the game starts with the hooded boy")
 	_assert(String(controller.call("_room_intro_text")) == "", "no text hint over the cliff")
 	# the shaft entry: small dust, and he stands up facing right
 	controller.shaft_dust.clear()
@@ -413,15 +410,6 @@ func _run() -> void:
 	short_actor.queue_free()
 	feel_actor.queue_free()
 	await _frames(1)
-	# F9 no longer switches the character: the hooded boy stays
-	var key := InputEventKey.new()
-	key.keycode = KEY_F9
-	key.pressed = true
-	if host.has_method("_unhandled_key_input"):
-		host._unhandled_key_input(key)
-	await create_timer(0.2).timeout
-	_assert(ActorStyleHost.style_override == ActorPoseState.STYLE_HOOD and host.hood_actor.visible and not host.crooked_tower_actor.visible, "F9 does nothing: the hooded boy stays (hood %s, knight %s)" % [host.hood_actor.visible, host.crooked_tower_actor.visible])
-	ActorStyleHost.style_override = &""
 	if failures.is_empty():
 		print("hood actor smoke OK")
 	else:

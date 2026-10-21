@@ -239,3 +239,9 @@
 - 反作用：水面高度和坡度会轻微托起、倾斜船（`_update_crate`：升降 0.75 倍、倾角最多 5°），人跟着船走。
 - 环：改成 4 圈，越撞得重扩得越远、消失越慢；撞击记录保留到 2.4 s。
 - 测试：`water_wave_probe.gd`（波高随时间）、`water_raft_probe.gd`（兜帽男孩在船上）、`water_wave_capture.gd`（窗口截图）。`river_contact_smoke` 的"水花消失"等待从 2 s 改到 2.8 s。
+
+### 2026-10-21：旧角色全部移除
+- 兜帽男孩是唯一的角色：`ActorStyleHost` 只剩他；`style_override`、`--legacy`、F9 都没有了；`ActorPoseState` 只有 `STYLE_HOOD`，姿态默认就是他。测试脚本不再需要指定角色。
+- 删掉的：折角塔骑士、天鹅绒娃娃、影子、矢量版角色的脚本和美术资源（约 12 MB），旧 `inkfall_actor_art`、C 区旧 `river_actor`、旧抓握/扇子帧清单，魔女骨架原型、旧 C 区"破木箱"原型，以及只测旧角色的测试（`actor_motion_smoke`、`river_smoke`、`river_fan_smoke`、`river_slide_animation_smoke`、`cliff_act_smoke`、`fan_swing_smoke`、`single_hand_smoke`）。
+- `river_controller`、`level_01_controller`、`river_art`、`cliff_act`、`level01_surface_audio` 里为旧角色保留的分支（慢速、旧船画法、灰闪、旧抓握）都已去掉。
+- 仍在用的旧测试按兜帽男孩的节奏改了时间和阈值（起步加速、拿放动作更长、船载重更轻、跳不上高台要攀爬）。

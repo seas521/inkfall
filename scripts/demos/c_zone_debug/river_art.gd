@@ -5,8 +5,6 @@ const Fan = preload("res://scripts/demos/c_zone_debug/fan_art.gd")
 const CrookedTree = preload("res://scripts/demos/c_zone_debug/crooked_tree_art.gd")
 const LIGHT = preload("res://assets/shaders/cinematic_light_cone.gdshader")
 const SCREEN := Vector2(1280, 720)
-const ActorStyleHostRef = preload("res://scripts/actors/actor_style_host.gd")
-const PoseRef = preload("res://scripts/actors/actor_pose_state.gd")
 const INK := Color("050606")
 
 var level: Node2D
@@ -663,7 +661,7 @@ func sync(delta: float, new_camera: float, active: bool) -> void:
 	fan_pickup.position = level.fan_rest_position()
 	fan_pickup.scale = Vector2(level.fan_ground_facing,1.0)*level.FAN_SCALE
 	fan_pickup.rotation = level.fan_ground_facing*1.35 + (level.crate_tilt if level.fan_on_raft else 0.0)
-	if ActorStyleHostRef.style_override == PoseRef.STYLE_HOOD and not level.fan_on_tree:
+	if not level.fan_on_tree:
 		# Lying on the ground the blade is seen from the side, almost edge-on: a thin leaf resting on the surface, not
 		# the whole face-on blade stuck on the ground (which covered the soil like a sticker).
 		fan_pickup.rotation = level.fan_ground_facing*1.50 + (level.crate_tilt if level.fan_on_raft else 0.0)
@@ -763,42 +761,11 @@ func _draw_props() -> void:
 		props.draw_circle(Vector2(2460,517),3.0,Color(0.76,0.76,0.76),true,-1,true)
 
 func _draw_crate() -> void:
-	if ActorStyleHostRef.style_override == PoseRef.STYLE_HOOD:
-		_draw_boat_back()
-		return
-	crate_art.draw_set_transform(-level.CRATE_SIZE * 0.5)
-	# The interior deck is the collision top. The rear gunwale stays behind the actor.
-	crate_art.draw_colored_polygon(PackedVector2Array([
-		Vector2(0,0), Vector2(144,0), Vector2(148,12), Vector2(141,28),
-		Vector2(118,32), Vector2(84,29), Vector2(57,33), Vector2(19,30),
-		Vector2(-5,24), Vector2(-3,9)
-	]), INK)
-	_beam(crate_art,Vector2(6,-13),Vector2(137,-16),7,4)
-	for x in [9.0, 59.0, 134.0]:
-		_beam(crate_art,Vector2(x,5),Vector2(x-2,-19),5, x)
-	# Short end grips bridge the pull pose's reach without moving the actor root.
-	_beam(crate_art,Vector2(128,17),Vector2(157,13),7,6)
-	_beam(crate_art,Vector2(155,19),Vector2(157,7),5,2)
-	_beam(crate_art,Vector2(14,17),Vector2(-12,14),6,3)
+	_draw_boat_back()
 
 func _draw_raft_front() -> void:
-	if ActorStyleHostRef.style_override == PoseRef.STYLE_HOOD:
-		_draw_boat_front()
-		return
-	raft_front.draw_set_transform(-level.CRATE_SIZE * 0.5)
-	# One continuous low front board hides soles, not a second collision wall.
-	raft_front.draw_colored_polygon(PackedVector2Array([
-		Vector2(-3,-8), Vector2(12,-12), Vector2(30,-10), Vector2(45,-13),
-		Vector2(61,-10), Vector2(82,-12), Vector2(105,-9), Vector2(125,-12),
-		Vector2(146,-8), Vector2(148,17), Vector2(129,26), Vector2(96,24),
-		Vector2(72,28), Vector2(39,25), Vector2(9,27), Vector2(-4,20)
-	]), INK)
-	_beam(raft_front,Vector2(16,-14),Vector2(17,28),4,7)
-	_beam(raft_front,Vector2(123,-13),Vector2(125,27),5,3)
+	_draw_boat_front()
 
-# The boat the hooded boy handles: a long skiff with a stem and a stern post that rise to chest height, where his hands
-# go when he pushes (flush with the ends); pulling, he takes up the rope tied to the post (drawn by the controller).
-# The deck line (y = 0) is the collision top.
 func _draw_boat_back() -> void:
 	crate_art.draw_set_transform(-level.CRATE_SIZE * 0.5)
 	# far side of the hull, rising to the stem and the stern post

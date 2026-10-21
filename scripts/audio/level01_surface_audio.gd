@@ -180,18 +180,10 @@ func _sync_character(
 	var free_to_move := actor_action == ActorPoseState.ACTION_NONE
 	var speed_ratio := clampf(absf(player_velocity.x) / 285.0, 0.0, 1.0)
 	var hood_steps: int = HoodFrameActor.footstep_serial
-	if ActorStyleHost.style_override == ActorPoseState.STYLE_HOOD:
-		# the hooded boy's feet come down every 0.167 s at a full run: the steps follow the animation
-		if grounded and free_to_move and speed_ratio > 0.16 and hood_steps != seen_hood_footsteps:
-			_play_footstep(speed_ratio)
-		footstep_time = 0.08
-	elif grounded and free_to_move and speed_ratio > 0.16:
-		footstep_time -= delta
-		if footstep_time <= 0.0:
-			_play_footstep(speed_ratio)
-			footstep_time = lerpf(0.49, 0.305, speed_ratio)
-	else:
-		footstep_time = minf(footstep_time, 0.08)
+	# his feet come down every 0.167 s at a full run: the steps follow the animation
+	if grounded and free_to_move and speed_ratio > 0.16 and hood_steps != seen_hood_footsteps:
+		_play_footstep(speed_ratio)
+	footstep_time = 0.08
 
 	seen_hood_footsteps = hood_steps
 

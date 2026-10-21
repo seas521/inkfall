@@ -200,7 +200,7 @@ func sync_environment(_env_fx: Node2D) -> void:
 func presentation_state() -> Dictionary:
 	var actor_screen_x := _world_to_screen(player_position + PLAYER_SIZE * 0.5).x
 	return {
-		"style_id": ActorPoseState.STYLE_CROOKED_TOWER,
+		"style_id": ActorPoseState.STYLE_HOOD,
 		"feet": _world_to_screen(player_position + Vector2(PLAYER_SIZE.x * 0.5, PLAYER_SIZE.y)),
 		"velocity": player_velocity,
 		"grounded": game_context.on_ground,

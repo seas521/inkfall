@@ -1,9 +1,5 @@
 extends RefCounted
 
-const STYLE_LEGACY: StringName = &"legacy"
-const STYLE_VELVET: StringName = &"velvet_doll"
-const STYLE_SHADOW: StringName = &"pumpkin_shadow"
-const STYLE_CROOKED_TOWER: StringName = &"crooked_tower"
 const STYLE_HOOD: StringName = &"hood"  # the hooded boy (hood_frame_actor.gd)
 const HOOD_RUN_SPEED_SCALE := 0.4737  # his run speed against the level's RUN_SPEED (285 px/s): 135 px/s (the recorded jog moves its feet at 78: the loop plays 1.25x, see HOOD_RUN_ANIM_SPEED)
 const HOOD_AIR_SPEED_SCALE := 0.8  # in the air he can go a little faster (a lunge), so a jump still gets across the gap
@@ -48,7 +44,7 @@ const ACTION_FALL_DOWNED: StringName = &"fall_downed"
 const ACTION_CLIMB: StringName = &"climb"  # hands over a ledge: hang, pull up, crawl, stand (the clip's root is the ledge corner)
 
 var active := true
-var style_id: StringName = STYLE_LEGACY
+var style_id: StringName = STYLE_HOOD
 var feet := Vector2.ZERO
 var velocity := Vector2.ZERO
 var grounded := false
@@ -82,7 +78,7 @@ var alarm := false  # frozen in fright (the hooded boy shows the scared pose)
 
 func apply(source: Dictionary) -> void:
 	active = bool(source.get("active", true))
-	style_id = StringName(source.get("style_id", STYLE_LEGACY))
+	style_id = StringName(source.get("style_id", STYLE_HOOD))
 	feet = Vector2(source.get("feet", Vector2.ZERO))
 	velocity = Vector2(source.get("velocity", Vector2.ZERO))
 	grounded = bool(source.get("grounded", false))
