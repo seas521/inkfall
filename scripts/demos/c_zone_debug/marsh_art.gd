@@ -8,6 +8,7 @@ extends Node2D
 const SCREEN := Vector2(1280.0, 720.0)
 const INK := Color("050606")
 const CliffArt = preload("res://scripts/demos/c_zone_debug/cliff_art.gd")
+const ForestInk = preload("res://scripts/demos/c_zone_debug/forest_ink.gd")
 const InkFlame = preload("res://scripts/effects/ink_flame.gd")
 const GRASS_SHADER := """shader_type canvas_item;
 // source_color: the ink must be converted like any other colour, or an HDR 2D (linear) viewport
@@ -468,6 +469,7 @@ func _draw_land_static() -> void:
 	_draw_spires()
 	_draw_set_dressing()
 	CliffArt.draw_static(self)
+	ForestInk.draw_static(self)
 
 const SHOULDER := 11.0
 
@@ -801,6 +803,7 @@ func _draw_grass() -> void:
 		var sx := rng.randf_range(slab.position.x + 8.0, slab.end.x - 8.0)
 		_blade(rng, sx, slab.position.y - 0.6, rng.randf_range(4.0, 10.0), 0.8)
 	CliffArt.draw_grass(self)
+	ForestInk.draw_grass(self)
 
 # On a slope the body's box cannot follow the ground, so one foot hangs in the air. Like act one's
 # hillside, every steep stretch gets a thick front band of grass that covers the feet.
@@ -880,6 +883,7 @@ func _draw_dynamic() -> void:
 	_draw_chips()
 	_draw_rocks_ink()
 	CliffArt.draw_dynamic(self)
+	ForestInk.draw_dynamic(self)
 
 # The preserved broken crate: an open wooden frame, hollow inside. Only the loaded top lip,
 # the two uprights (the right one snapped), the sill and the diagonal brace exist.
@@ -1228,6 +1232,7 @@ func _draw_fog_puffs() -> void:
 			var bx := left - 60.0 + fposmod(float(k) * 151.7 + clock * (2.0 + float(k % 3) * 1.5), width + 120.0)
 			var by := 566.0 + float(k % 3) * 14.0 + sin(clock * 0.25 + float(k) * 1.7) * 4.0
 			_soft(fog, Vector2(bx, by), Vector2(300.0 + float(k % 3) * 70.0, 46.0 + float(k % 2) * 14.0), Color(0.16, 0.16, 0.155, 0.14))
+	ForestInk.draw_fog(self)
 
 # ------------------------------------------------------------ effects layer
 
@@ -1235,6 +1240,7 @@ func _draw_effects() -> void:
 	_draw_fire()
 	_draw_crumble_dust()
 	CliffArt.draw_effects(self)
+	ForestInk.draw_effects(self)
 
 # One blister on the bog: it swells as a glossy dome until about four fifths of its life, bursts,
 # and leaves an expanding ring that fades.

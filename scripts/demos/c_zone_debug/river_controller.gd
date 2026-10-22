@@ -608,7 +608,7 @@ func restore_checkpoint() -> void:
 	camera_x = clampf(player.position.x - 540.0, 0.0, WORLD_WIDTH - 1280.0)
 	camera.position.x = camera_x + 640.0
 	if checkpoint >= 5:
-		camera_y = minf(0.0, player.position.y - 300.0)
+		camera_y = _camera_target_y()
 		camera.position.y = 360.0 + camera_y
 	_present(0.0)
 
@@ -789,13 +789,19 @@ func _physics_process(delta: float) -> void:
 	_update_camera(delta)
 	_present(delta)
 
+# Up the cliff the camera climbs with the player; in the forest above it the player stands low in the picture (ground at about
+# three quarters of the way down), as everywhere else; elsewhere it holds level.
+func _camera_target_y() -> float:
+	if player.position.x > 7300.0:
+		return minf(0.0, player.position.y - 500.0)
+	return minf(0.0, player.position.y - 300.0) if player.position.x > 6850.0 else 0.0
+
 func _update_camera(delta: float) -> void:
 	var target_camera := clampf(player.position.x - 525.0, 0.0, WORLD_WIDTH - 1280.0)
 	camera_x = lerpf(camera_x, target_camera, 1.0 - exp(-delta * 3.8))
 	camera.position.x = camera_x + 640.0
 	# Up the cliff the camera climbs with the player; everywhere else it holds level.
-	var target_y := minf(0.0, player.position.y - 300.0) if player.position.x > 6850.0 else 0.0
-	camera_y = lerpf(camera_y, target_y, 1.0 - exp(-delta * 4.0))
+	camera_y = lerpf(camera_y, _camera_target_y(), 1.0 - exp(-delta * 4.0))
 	camera.position.y = 360.0 + camera_y
 	camera_look = move_toward(camera_look, -18.0 if rock_lock_time > 0.0 else 0.0, delta * 60.0)
 	camera.offset = Vector2(sin(clock * 41.0), cos(clock * 53.0) * 0.6) * camera_shake + Vector2(0.0, camera_look)
@@ -2459,7 +2465,7 @@ func debug_enter_forest_act() -> void:
 	intro_time = 0.0
 	camera_x = clampf(player.position.x - 525.0, 0.0, WORLD_WIDTH - 1280.0)
 	camera.position.x = camera_x + 640.0
-	camera_y = minf(0.0, player.position.y - 300.0)
+	camera_y = _camera_target_y()
 	camera.position.y = 360.0 + camera_y
 	_present(0.0)
 

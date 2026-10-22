@@ -33,14 +33,14 @@ func _run() -> void:
 	_check(level.player.is_on_floor() and absf(level.player.position.y + 54.0 - ground) < 3.0, "he stands on the hillside above the lift (feet %.1f, ground %.1f)" % [level.player.position.y + 54.0, ground])
 	_check(not forest.rope_attached(), "not holding anything yet")
 	# stand under the rope: it is out of reach (his hands are below its end)
-	level.player.position = Vector2(forest.PRACTICE_PIVOT.x - 13.0, forest.FLOOR_Y - 56.0)
+	level.player.position = Vector2(forest.VINE_PIVOT.x - 13.0, forest.FLOOR_Y - 56.0)
 	level.player.velocity = Vector2.ZERO
 	await _frames(20)
 	forest.try_grab(level.player)
 	_check(not forest.rope_attached(), "standing he cannot reach the rope")
 	# jump at it
 	Input.action_press("jump")
-	await _frames(8)
+	await _frames(30)
 	Input.action_release("jump")
 	var grabbed := false
 	for i in 90:

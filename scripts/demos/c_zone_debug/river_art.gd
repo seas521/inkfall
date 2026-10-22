@@ -51,6 +51,7 @@ var atmosphere: ColorRect
 var lens: ColorRect
 var cone: ColorRect
 var cone_act_two: ColorRect
+var cone_forest: ColorRect
 var fan_pickup: Node2D
 var mid_view: SubViewport
 var fore_view: SubViewport
@@ -123,6 +124,17 @@ void fragment() {
 	light_two.set_shader_parameter("light_tint", Vector3(0.70, 0.70, 0.70))
 	cone_act_two.material = light_two
 	back_layer.add_child(cone_act_two)
+	# and once more over the forest above the lift
+	cone_forest = ColorRect.new()
+	cone_forest.size = Vector2(950, 790)
+	cone_forest.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var light_forest := ShaderMaterial.new()
+	light_forest.shader = LIGHT
+	light_forest.set_shader_parameter("intensity", 0.13)
+	light_forest.set_shader_parameter("seed", 0.71)
+	light_forest.set_shader_parameter("light_tint", Vector3(0.70, 0.70, 0.70))
+	cone_forest.material = light_forest
+	back_layer.add_child(cone_forest)
 	terrain = Node2D.new()
 	terrain.z_index = -2
 	terrain.draw.connect(_draw_terrain)
@@ -650,8 +662,11 @@ func sync(delta: float, new_camera: float, active: bool) -> void:
 	background.position.x = -90.0 - camera_x * 0.10
 	cone.position = Vector2(370.0 - camera_x * 0.22, -155)
 	cone_act_two.position = Vector2(370.0 + (3900.0 - camera_x) * 0.22, -155)
-	cone_act_two.modulate.a = smoothstep(2000.0, 3000.0, camera_x)
+	cone_act_two.modulate.a = smoothstep(2000.0, 3000.0, camera_x) * (1.0 - smoothstep(6600.0, 7300.0, camera_x))
 	cone_act_two.visible = cone_act_two.modulate.a > 0.01
+	cone_forest.position = Vector2(300.0 + (8500.0 - camera_x) * 0.22, -155)
+	cone_forest.modulate.a = smoothstep(6900.0, 7500.0, camera_x)
+	cone_forest.visible = cone_forest.modulate.a > 0.01
 	(cone.material as ShaderMaterial).set_shader_parameter("clock", clock)
 	(cone_act_two.material as ShaderMaterial).set_shader_parameter("clock", clock)
 	for plane in [atmosphere, lens]:
@@ -688,8 +703,17 @@ func sync(delta: float, new_camera: float, active: bool) -> void:
 
 func _draw_mid() -> void:
 	# These sparse trees move independently of the distant bitmap and playable bank.
-	for spec in [Vector3(110, 95, 0.27), Vector3(1180, 74, 0.24), Vector3(1710, 56, 0.25), Vector3(1960, 108, 0.29), Vector3(2230, 120, 0.32), Vector3(2640, 70, 0.26)]:
+	var specs: Array = [Vector3(110, 95, 0.27), Vector3(1180, 74, 0.24), Vector3(1710, 56, 0.25), Vector3(1960, 108, 0.29), Vector3(2230, 120, 0.32), Vector3(2640, 70, 0.26)]
+	if camera_x > 6200.0:
+		# the forest above the lift: a stand of trunks that slide slower than the camera
+		var forest_rng := RandomNumberGenerator.new()
+		forest_rng.seed = 4242
+		for i in range(26):
+			specs.append(Vector3(2000.0 + float(i) * 150.0 + forest_rng.randf_range(-40.0, 40.0), forest_rng.randf_range(40.0, 120.0), forest_rng.randf_range(0.20, 0.34)))
+	for spec in specs:
 		var x: float = spec.x - camera_x * 0.29
+		if x < -260.0 or x > 1540.0:
+			continue
 		var w: float = spec.y
 		var c := Color(spec.z, spec.z, spec.z, 0.22)
 		mid.draw_colored_polygon(PackedVector2Array([
@@ -958,6 +982,15 @@ func _draw_foreground() -> void:
 		if sx < -60.0 or sx > 1340.0:
 			continue
 		foreground.draw_colored_polygon(PackedVector2Array([Vector2(sx-width,744),Vector2(sx+lean,744-height),Vector2(sx+width,744)]),Color(0.012,0.014,0.014,0.85))
+	if camera_x > 6200.0:
+		# the forest above the lift: a few near trunks go past faster than the camera and frame the picture
+		for spec in [Vector3(8700.0, 52.0, 0.0), Vector3(9560.0, 44.0, 1.0), Vector3(10520.0, 56.0, 2.0), Vector3(11500.0, 46.0, 3.0), Vector3(12500.0, 54.0, 4.0)]:
+			var tx: float = spec.x - camera_x * 1.14
+			if tx < -200.0 or tx > 1480.0:
+				continue
+			var tw: float = spec.y
+			var lean: float = sin(spec.z * 2.3) * 14.0
+			foreground.draw_colored_polygon(PackedVector2Array([Vector2(tx - tw * 0.5, -30), Vector2(tx + tw * 0.5, -30), Vector2(tx + tw * 0.62 + lean, 330), Vector2(tx + tw * 0.9, 744), Vector2(tx - tw * 0.9, 744), Vector2(tx - tw * 0.6 + lean, 330)]), Color("090a0a"))
 	for i in range(12):
 		var age := fposmod(clock*0.019+i*0.117,1.0)
 		var mote := Vector2(fposmod(i*137.0-camera_x*0.40+age*30.0,1280.0),580-age*420.0)
