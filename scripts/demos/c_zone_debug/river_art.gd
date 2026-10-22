@@ -56,6 +56,8 @@ var cone_act_two: ColorRect
 var cone_forest: ColorRect
 var surface_layer: CanvasLayer
 var surface_art: Node2D
+var forest_veil_layer: CanvasLayer
+var forest_veil: Sprite2D
 var fan_pickup: Node2D
 var mid_view: SubViewport
 var fore_view: SubViewport
@@ -106,6 +108,18 @@ void fragment() {
 	surface_art = SurfaceArt.new()
 	surface_art.far_mode = true
 	surface_layer.add_child(surface_art)
+	# The forest backdrop once more, above the far valley: it thins out to nothing as he comes out of the trees, uncovering the valley
+	forest_veil_layer = CanvasLayer.new()
+	forest_veil_layer.layer = -8
+	add_child(forest_veil_layer)
+	forest_veil = Sprite2D.new()
+	forest_veil.centered = false
+	forest_veil.texture = BACKGROUND
+	forest_veil.scale = background.scale
+	forest_veil.position = background.position
+	forest_veil.texture_filter = background.texture_filter
+	forest_veil.material = background.material
+	forest_veil_layer.add_child(forest_veil)
 	mid_view = _blur_layer(back_layer, 8.0)
 	mid_blur_sprite = mid_view.get_meta(&"output_sprite") as Sprite2D
 	mid = Node2D.new()
@@ -664,18 +678,26 @@ void fragment() {
 	result.set_shader_parameter("lens", is_lens)
 	return result
 
+# 0 deep in the forest, 1 when he steps out of the trees onto the open ground: the dark forest backdrop gives way to the wide valley
+# as the trunks thin out (the trees along the route end where this reaches 1).
+func _emergence() -> float:
+	return smoothstep(-6100.0, -5250.0, camera_x)
+
 func sync(delta: float, new_camera: float, active: bool) -> void:
 	visible = active
 	clock += delta
 	camera_x = new_camera
 	# Act one's planes never switch off: the backdrop must flow into act two without a seam.
 	var first_act_world_animated := camera_x < 2180.0 and camera_x > -200.0
-	surface_layer.visible = camera_x < -2400.0
+	var emergence := _emergence()
+	surface_layer.visible = camera_x < -2400.0 and emergence > 0.001
+	forest_veil_layer.visible = surface_layer.visible and emergence < 0.999
+	forest_veil.modulate.a = 1.0 - emergence
+	forest_veil.position = background.position
 	if surface_layer.visible:
 		# the far cliff drifts slowly with the camera, and rises out of the picture as he goes down
 		var far_shift := Vector2(-(camera_x + 5000.0) * 0.015, -(float(level.camera_y) + 4850.0) * 0.10)
 		surface_art.set_far_placement(Vector2(430.0, 120.0) + far_shift, 0.78, 0.86)
-		surface_art.modulate.a = smoothstep(-5800.0, -4500.0, camera_x)
 		surface_art.sync(delta, 0.0, 0.0, true, 0.0)
 	water_volume.visible = camera_x < 2750.0
 	background.position.x = -90.0 - maxf(camera_x, 0.0) * 0.10
@@ -741,7 +763,7 @@ func _draw_mid() -> void:
 		if x < -260.0 or x > 1540.0:
 			continue
 		var w: float = spec.y
-		var c := Color(spec.z, spec.z, spec.z, 0.22)
+		var c := Color(spec.z, spec.z, spec.z, 0.22 * (1.0 - (_emergence() if camera_x < -200.0 else 0.0)))
 		mid.draw_colored_polygon(PackedVector2Array([
 			Vector2(x-w*0.4,-30),Vector2(x+w*0.5,-30),Vector2(x+w*0.3,330),
 			Vector2(x+w*0.55,470),Vector2(x+w,555),Vector2(x-w,555),
@@ -1008,7 +1030,7 @@ func _draw_foreground() -> void:
 		if sx < -60.0 or sx > 1340.0:
 			continue
 		foreground.draw_colored_polygon(PackedVector2Array([Vector2(sx-width,744),Vector2(sx+lean,744-height),Vector2(sx+width,744)]),Color(0.012,0.014,0.014,0.85))
-	if camera_x < -4200.0:
+	if camera_x < -5300.0:
 		# scenes 1 to 6: a few near trunks go past faster than the camera and frame the picture (each one fixed by its index)
 		var near_first := int(floor(camera_x * 1.14 / 900.0)) - 1
 		for i in range(near_first, near_first + 4):

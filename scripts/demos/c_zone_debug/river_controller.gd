@@ -665,6 +665,8 @@ func _physics_process(delta: float) -> void:
 	if scene1.fell_off():
 		restore_checkpoint()
 		return
+	if marsh_hit_time <= 0.0 and death_time <= 0.0 and scene1.hazard_hit():
+		_start_marsh_hit("fall", player.position + PLAYER_SIZE * 0.5)  # thorns / the spikes at the bottom of a pit
 	_update_marsh_rocks(delta)
 	grip_time = maxf(0.0, grip_time - delta)
 	release_time = maxf(0.0, release_time - delta)

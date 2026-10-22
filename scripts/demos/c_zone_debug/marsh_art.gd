@@ -1245,7 +1245,6 @@ func _draw_effects() -> void:
 	_draw_crumble_dust()
 	CliffArt.draw_effects(self)
 	ForestInk.draw_effects(self)
-	Scene1Ink.draw_effects(self)
 
 # One blister on the bog: it swells as a glossy dome until about four fifths of its life, bursts,
 # and leaves an expanding ring that fades.
