@@ -12,9 +12,11 @@ const SmallItem = preload("res://scripts/actors/small_item_renderer.gd")
 const CliffAct = preload("res://scripts/demos/c_zone_debug/cliff_act.gd")
 const CliffArt = preload("res://scripts/demos/c_zone_debug/cliff_art.gd")
 const ForestAct = preload("res://scripts/demos/c_zone_debug/forest_act.gd")
+const Scene1Act = preload("res://scripts/demos/c_zone_debug/scene1_act.gd")
 const HoodManifest = preload("res://scripts/actors/hood_actor_manifest.gd")
 
 const WORLD_WIDTH := 15200.0
+const WORLD_MIN_X := -12000.0  # scenes 1 to 6 (the cliff, the descent and the bat cave) lie west of the C zone
 const PLAYER_SIZE := Vector2(26, 54)
 const ACTOR_VISUAL_SCALE := 0.90
 const CRATE_SIZE := Vector2(144, 32)
@@ -196,6 +198,7 @@ var art: Node2D
 var marsh_art: Node2D
 var cliff: Node2D
 var forest: Node2D
+var scene1: Node2D
 var stone_nodes: Array[Node2D] = []
 var stone_scales: Array[float] = []
 var fade_rect: ColorRect
@@ -320,6 +323,9 @@ func _ready() -> void:
 	forest = ForestAct.new()
 	forest.level = self
 	add_child(forest)
+	scene1 = Scene1Act.new()
+	scene1.level = self
+	add_child(scene1)
 	camera = Camera2D.new()
 	camera.position = Vector2(640, 360)
 	add_child(camera)
@@ -497,7 +503,7 @@ func debug_enter_marsh_act() -> void:
 	beached = true
 	floating = false
 	intro_time = 0.0
-	camera_x = clampf(player.position.x - 525.0, 0.0, WORLD_WIDTH - 1280.0)
+	camera_x = clampf(player.position.x - 525.0, WORLD_MIN_X, WORLD_WIDTH - 1280.0)
 	camera.position = Vector2(camera_x + 640.0, 360.0)
 	_present(0.0)
 
@@ -507,7 +513,11 @@ func restore_checkpoint() -> void:
 		camera.position.y = 360.0
 	player.position = Vector2(590, 496)
 	crate.position = CRATE_START
-	if checkpoint >= 5:
+	if checkpoint == 6:
+		# Scene 1: he lies in the grass at the edge of the forest.
+		player.position = Scene1Act.spawn_position()
+		crate.position = Vector2(RAFT_FLUSH_X, CRATE_START.y)
+	elif checkpoint >= 5:
 		# Act four: the hillside above the lift.
 		player.position = Vector2(ForestAct.START_X + 60.0, ForestAct.FLOOR_Y - PLAYER_SIZE.y - 2.0)
 		crate.position = Vector2(RAFT_FLUSH_X, CRATE_START.y)
@@ -548,6 +558,7 @@ func restore_checkpoint() -> void:
 		_clear_marsh_rocks()
 	cliff.reset(checkpoint >= 4)
 	forest.reset()
+	scene1.reset()
 	rock_first_delay = 0.6
 	fan_owned = checkpoint_fan
 	fan_revealed = true
@@ -605,7 +616,7 @@ func restore_checkpoint() -> void:
 	jump_buffer = 0.0
 	jump_windup_left = 0.0
 	facing = 1.0
-	camera_x = clampf(player.position.x - 540.0, 0.0, WORLD_WIDTH - 1280.0)
+	camera_x = clampf(player.position.x - 540.0, WORLD_MIN_X, WORLD_WIDTH - 1280.0)
 	camera.position.x = camera_x + 640.0
 	if checkpoint >= 5:
 		camera_y = _camera_target_y()
@@ -650,6 +661,10 @@ func _physics_process(delta: float) -> void:
 	_update_hang_deck(delta)
 	cliff.tick(delta)
 	forest.tick(delta)
+	scene1.tick(delta)
+	if scene1.fell_off():
+		restore_checkpoint()
+		return
 	_update_marsh_rocks(delta)
 	grip_time = maxf(0.0, grip_time - delta)
 	release_time = maxf(0.0, release_time - delta)
@@ -707,7 +722,7 @@ func _physics_process(delta: float) -> void:
 		_update_interaction(direction)
 	if player.position.x >= SECOND_ACT_LEDGE.position.x:
 		_retire_fan_for_second_act()
-	if (pickup_time > 0.0 and not airborne_pickup) or put_down_time > 0.0 or cliff.locks_move():
+	if (pickup_time > 0.0 and not airborne_pickup) or put_down_time > 0.0 or (cliff.locks_move() or scene1.locks_move()):
 		direction = 0.0
 		player.velocity.x = 0.0
 	var previous_crate := crate.position
@@ -792,12 +807,15 @@ func _physics_process(delta: float) -> void:
 # Up the cliff the camera climbs with the player; in the forest above it the player stands low in the picture (ground at about
 # three quarters of the way down), as everywhere else; elsewhere it holds level.
 func _camera_target_y() -> float:
+	if player.position.x < -300.0:
+		# scenes 1 to 6: the camera follows him up there, and comes back to level at the foot of the cliff
+		return minf(0.0, player.position.y - 500.0) if player.position.y < 100.0 else 0.0
 	if player.position.x > 7300.0:
 		return minf(0.0, player.position.y - 500.0)
 	return minf(0.0, player.position.y - 300.0) if player.position.x > 6850.0 else 0.0
 
 func _update_camera(delta: float) -> void:
-	var target_camera := clampf(player.position.x - 525.0, 0.0, WORLD_WIDTH - 1280.0)
+	var target_camera := clampf(player.position.x - 525.0, WORLD_MIN_X, WORLD_WIDTH - 1280.0)
 	camera_x = lerpf(camera_x, target_camera, 1.0 - exp(-delta * 3.8))
 	camera.position.x = camera_x + 640.0
 	# Up the cliff the camera climbs with the player; everywhere else it holds level.
@@ -1825,6 +1843,8 @@ func _update_player(delta: float, direction: float, crate_speed: float) -> void:
 	var in_shallows := player.position.y + 54.0 > WATER_Y + 10.0
 	if in_shallows:
 		speed = 160.0
+	elif scene1.in_pond():
+		speed *= 0.62  # wading through a shallow pond in scene 1
 	var target := direction * speed
 	_update_rope_mode(delta, direction)
 	if entry_brake:
@@ -1845,7 +1865,7 @@ func _update_player(delta: float, direction: float, crate_speed: float) -> void:
 			accel = Pose.HOOD_START_ACCEL  # the first step shows before he is at speed (no sliding on the spot)
 		player.velocity.x = move_toward(player.velocity.x, target, delta * accel)
 	player.velocity.y = minf(850.0, player.velocity.y + 1500.0 * delta)
-	if rock_lock_time > 0.0 or cliff.locks_move():
+	if rock_lock_time > 0.0 or (cliff.locks_move() or scene1.locks_move()):
 		jump_buffer = 0.0
 	var hood_gathers := grounded
 	if jump_buffer > 0.0 and coyote > 0.0 and jump_windup_left <= 0.0:
@@ -1857,7 +1877,7 @@ func _update_player(delta: float, direction: float, crate_speed: float) -> void:
 			_launch_jump(jump_scale)
 	elif jump_windup_left > 0.0:
 		jump_windup_left -= delta
-		if coyote <= 0.0 or rock_lock_time > 0.0 or cliff.locks_move():
+		if coyote <= 0.0 or rock_lock_time > 0.0 or (cliff.locks_move() or scene1.locks_move()):
 			jump_windup_left = 0.0  # he left the ground (or was frozen) while gathering: no jump
 		elif jump_windup_left <= 0.0:
 			jump_windup_left = 0.0
@@ -1867,7 +1887,7 @@ func _update_player(delta: float, direction: float, crate_speed: float) -> void:
 	if not Input.is_action_pressed("jump") and player.velocity.y < jump_cut:
 		player.velocity.y = jump_cut
 	player.move_and_slide()
-	player.position.x = clampf(player.position.x, 20.0, WORLD_WIDTH - 55.0)
+	player.position.x = clampf(player.position.x, WORLD_MIN_X + 20.0, WORLD_WIDTH - 55.0)
 
 # --- climbing ------------------------------------------------------------------------------------------
 # The hooded boy jumps about his own height (Pose.HOOD_JUMP_SCALE); anything higher he climbs: a jump that brings his hands
@@ -1963,7 +1983,7 @@ func _climb_blocked(direction: float) -> bool:
 	# his hands are busy
 	if dragging or puzzle_box_dragging or fan_owned or cliff.carrying >= 0 or rock_shove_index >= 0 or rock_lock_time > 0.0:
 		return true
-	if pickup_time > 0.0 or put_down_time > 0.0 or fan_swing > 0.0 or release_time > 0.0 or cliff.locks_move():
+	if pickup_time > 0.0 or put_down_time > 0.0 or fan_swing > 0.0 or release_time > 0.0 or (cliff.locks_move() or scene1.locks_move()):
 		return true
 	return false
 
@@ -2172,6 +2192,10 @@ func _present(delta: float) -> void:
 		progress = 0.11 + 0.05 * (0.5 + 0.5 * sin(clock * 17.0))
 	elif rock_shove_index >= 0:
 		action = &"push"
+	elif scene1.pose_info().action != Pose.ACTION_NONE:
+		var scene1_pose: Dictionary = scene1.pose_info()
+		action = scene1_pose.action
+		progress = scene1_pose.progress
 	elif cliff_pose.action != Pose.ACTION_NONE:
 		action = cliff_pose.action
 		progress = cliff_pose.progress
@@ -2450,6 +2474,25 @@ func _act_finished() -> void:
 	if return_to_debug_menu and not hosted_in_level:
 		_return_to_debug()
 
+func debug_enter_scene1() -> void:
+	debug_return_index = 4
+	checkpoint = 6
+	checkpoint_fan = false
+	restore_checkpoint()
+	player.velocity = Vector2.ZERO
+	fan_owned = false
+	fan_on_tree = false
+	fan_revealed = false
+	landed = true
+	beached = true
+	floating = false
+	intro_time = 0.0
+	camera_x = clampf(player.position.x - 525.0, WORLD_MIN_X, WORLD_WIDTH - 1280.0)
+	camera.position.x = camera_x + 640.0
+	camera_y = _camera_target_y()
+	camera.position.y = 360.0 + camera_y
+	_present(0.0)
+
 func debug_enter_forest_act() -> void:
 	debug_return_index = 3
 	checkpoint = 5
@@ -2463,7 +2506,7 @@ func debug_enter_forest_act() -> void:
 	beached = true
 	floating = false
 	intro_time = 0.0
-	camera_x = clampf(player.position.x - 525.0, 0.0, WORLD_WIDTH - 1280.0)
+	camera_x = clampf(player.position.x - 525.0, WORLD_MIN_X, WORLD_WIDTH - 1280.0)
 	camera.position.x = camera_x + 640.0
 	camera_y = _camera_target_y()
 	camera.position.y = 360.0 + camera_y
@@ -2482,7 +2525,7 @@ func debug_enter_cliff_act() -> void:
 	beached = true
 	floating = false
 	intro_time = 0.0
-	camera_x = clampf(player.position.x - 525.0, 0.0, WORLD_WIDTH - 1280.0)
+	camera_x = clampf(player.position.x - 525.0, WORLD_MIN_X, WORLD_WIDTH - 1280.0)
 	camera.position = Vector2(camera_x + 640.0, 360.0)
 	_present(0.0)
 

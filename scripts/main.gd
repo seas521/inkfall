@@ -19,13 +19,14 @@ const PAPER := Palette.PAPER
 const MARSH_DEBUG_INDEX := 1
 const CLIFF_DEBUG_INDEX := 2
 const FOREST_DEBUG_INDEX := 3
-const MAX_DEBUG_INDEX := 3
+const SCENE1_DEBUG_INDEX := 4
+const MAX_DEBUG_INDEX := 4
 const DEBUG_RETURN_META := &"inkfall_debug_return"
 const RiverTransition = preload("res://scripts/levels/level01_river_transition.gd")
 const FilmLook = preload("res://scripts/effects/film_look.gd")
 
 @export_category("DEBUG")
-@export_enum("运行时关卡菜单", "1-01 · 墨坠井", "C区第二幕 · 枯枝瘴沼", "C区第三幕 · 断桥与升降梯", "C区第四幕 · 山坡与森林")
+@export_enum("运行时关卡菜单", "1-01 · 墨坠井", "C区第二幕 · 枯枝瘴沼", "C区第三幕 · 断桥与升降梯", "C区第四幕 · 山坡与森林", "场景 1 · 巨影追猎（新）")
 var debug_start_level: int = 0
 
 var game_context = GameContext.new()
@@ -120,6 +121,9 @@ func _start_debug_level() -> void:
 		FOREST_DEBUG_INDEX:
 			_mount_river(false)
 			river.debug_enter_forest_act()
+		SCENE1_DEBUG_INDEX:
+			_mount_river(false)
+			river.debug_enter_scene1()
 	queue_redraw()
 
 # `index` is the level controller (0 = 1-01; the others are the earlier prototypes the old progression still reaches)
@@ -202,8 +206,8 @@ func _draw() -> void:
 func _draw_debug_selector() -> void:
 	draw_string(ui_font, Vector2(72.0, 92.0), "INKFALL · DEBUG", HORIZONTAL_ALIGNMENT_LEFT, -1.0, 30, INK)
 	draw_string(ui_font, Vector2(74.0, 128.0), "关卡测试入口", HORIZONTAL_ALIGNMENT_LEFT, -1.0, 16, Color(INK, 0.58))
-	var titles := ["DEBUG · 1-01 · 墨坠井", "DEBUG · C区第二幕 · 枯枝瘴沼", "DEBUG · C区第三幕 · 断桥与升降梯", "DEBUG · C区第四幕 · 山坡与森林"]
-	var details := ["悬崖井口 → 火焰竖井 → 雾岸渡水 → 枯枝瘴沼 → 断桥与升降梯 → 森林", "高台木箱 → 大树秋千 → 毒气石柱 → 落石与喷火", "投石砸断吊桥绳 → 过桥 → 带石上升降梯 → 砸断配重绳 → 升上悬崖", "升降梯之上的山坡 → 森林的第一个房间（目前只有美术和绳）"]
+	var titles := ["DEBUG · 1-01 · 墨坠井", "DEBUG · C区第二幕 · 枯枝瘴沼", "DEBUG · C区第三幕 · 断桥与升降梯", "DEBUG · C区第四幕 · 山坡与森林", "DEBUG · 场景 1 · 巨影追猎（新，制作中）"]
+	var details := ["悬崖井口 → 火焰竖井 → 雾岸渡水 → 枯枝瘴沼 → 断桥与升降梯 → 森林", "高台木箱 → 大树秋千 → 毒气石柱 → 落石与喷火", "投石砸断吊桥绳 → 过桥 → 带石上升降梯 → 砸断配重绳 → 升上悬崖", "升降梯之上的山坡 → 森林的第一个房间（目前只有美术和绳）", "躺在森林边 → 爬起来 → 向右跑，翻倒木、跳断沟、爬岩阶 → 崖边（猎人和追逐还没做）"]
 	for index in titles.size():
 		var rect := Rect2(72.0, 140.0 + float(index) * 70.0, 1040.0, 62.0)
 		var selected := index == debug_selection

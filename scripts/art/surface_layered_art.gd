@@ -23,6 +23,13 @@ const FIRELIGHT_SHADER: Shader = preload("res://assets/shaders/level01_firelight
 var clock := 0.0
 var player_x := 170.0
 var right_shift_x := 0.0
+var world_offset := Vector2.ZERO  # moves the cliffs, the house, the tree and the fire (not the sky) when this art is placed in a scrolling world
+var show_left_foreground := true
+# far mode: only the right cliff with the house, the yard tree and the fire is kept, as a distant cliff in the haze (placed by
+# set_far_placement); the left cliff, the grass and the foreground frames are not drawn
+var far_mode := false
+var far_group: Node2D
+var gameplay_region_offset := Vector2.ZERO
 var fire_intensity := 0.86
 var bat_gust := 0.0
 
@@ -82,6 +89,27 @@ func _ready() -> void:
 
 	_configure_layout()
 	_configure_materials()
+	if far_mode:
+		far_group = Node2D.new()
+		add_child(far_group)
+		for part in [gameplay_sprite, tree_sprite, fire_sprite, fire_flame, fire_air]:
+			remove_child(part)
+			far_group.add_child(part)
+		gameplay_sprite.region_enabled = true
+		gameplay_sprite.region_rect = Rect2(880.0, 250.0, 792.0, 691.0)
+		gameplay_region_offset = Vector2(880.0, 250.0) * PLATE_SCALE
+		# the plate stops at its bottom edge: a bank of mist hides it and the cliff goes down into the haze
+		var far_mist := Node2D.new()
+		far_mist.z_index = 20
+		far_mist.draw.connect(func() -> void:
+			var top := Color(0.20, 0.20, 0.20, 0.0)
+			var bottom := Color(0.20, 0.20, 0.20, 1.0)
+			far_mist.draw_polygon(PackedVector2Array([Vector2(640, 480), Vector2(1800, 480), Vector2(1800, 1000), Vector2(640, 1000)]), PackedColorArray([top, top, bottom, top])))
+		far_group.add_child(far_mist)
+		cliff_grass.visible = false
+		foreground_right.visible = false
+		foreground_left_tree.visible = false
+		fire_light.visible = false
 
 
 func _make_sprite(texture_value: Texture2D, z_value: int, relative_z: bool = true) -> Sprite2D:
@@ -403,14 +431,15 @@ func sync(
 	mid_fog.position = Vector2(0.0, -camera_y * 0.46)
 	moon_light.position = Vector2(-70.0, 34.0 - camera_y * 0.16)
 	valley_light.position = Vector2(250.0, 118.0 - camera_y * 0.32)
-	fire_light.position = Vector2(920.0, 274.0 - camera_y)
+	fire_light.position = Vector2(920.0 + world_offset.x, 274.0 - camera_y + world_offset.y)
 
-	gameplay_sprite.position = Vector2(0.0, 65.0 - camera_y)
-	tree_sprite.position.y = 378.0 - 826.0 * 0.245 - camera_y
-	fire_sprite.position.y = 378.0 - 714.0 * 0.18 - camera_y
-	fire_flame.position = Vector2(1017.0, 361.0 - camera_y)
-	fire_air.position = Vector2(0.0, -camera_y)
-	cliff_grass.position = Vector2(0.0, -camera_y)
+	gameplay_sprite.position = Vector2(world_offset.x, 65.0 - camera_y + world_offset.y) + gameplay_region_offset
+	tree_sprite.position = Vector2(1232.0 - 1015.0 * 0.245 + world_offset.x, 378.0 - 826.0 * 0.245 - camera_y + world_offset.y)
+	fire_sprite.position = Vector2(1017.0 - 838.0 * 0.18 + world_offset.x, 378.0 - 714.0 * 0.18 - camera_y + world_offset.y)
+	fire_flame.position = Vector2(1017.0 + world_offset.x, 361.0 - camera_y + world_offset.y)
+	fire_air.position = Vector2(world_offset.x, -camera_y + world_offset.y)
+	cliff_grass.position = Vector2(world_offset.x, -camera_y + world_offset.y)
+	foreground_left_tree.visible = show_left_foreground and not far_mode
 
 	foreground_right.position.y = FOREGROUND_TOP - camera_y * 1.04
 	foreground_left_tree.position.y = FOREGROUND_RICH_TOP - camera_y * 1.0
@@ -522,3 +551,10 @@ func _draw_foreground_air() -> void:
 		var y := fposmod(float(grain_index * 137 + frame_seed * 53), SCREEN.y)
 		var value := 0.30 if (grain_index + frame_seed) % 4 == 0 else 0.0
 		foreground_air.draw_circle(Vector2(x, y), 0.45, Color(value, value, value, 0.007), true, -1.0, false)
+
+# Far mode: where the distant cliff stands on the screen and how big it is.
+func set_far_placement(at: Vector2, scale_value: float, haze: float) -> void:
+	if far_group != null:
+		far_group.position = at
+		far_group.scale = Vector2.ONE * scale_value
+		far_group.modulate = Color(1.0, 1.0, 1.0, haze)

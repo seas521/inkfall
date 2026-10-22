@@ -6,6 +6,8 @@ const CrookedTree = preload("res://scripts/demos/c_zone_debug/crooked_tree_art.g
 const LIGHT = preload("res://assets/shaders/cinematic_light_cone.gdshader")
 const SCREEN := Vector2(1280, 720)
 const INK := Color("050606")
+const SurfaceArt = preload("res://scripts/art/surface_layered_art.gd")
+const Scene1Ref = preload("res://scripts/demos/c_zone_debug/scene1_act.gd")
 
 var level: Node2D
 var clock := 0.0
@@ -52,6 +54,8 @@ var lens: ColorRect
 var cone: ColorRect
 var cone_act_two: ColorRect
 var cone_forest: ColorRect
+var surface_layer: CanvasLayer
+var surface_art: Node2D
 var fan_pickup: Node2D
 var mid_view: SubViewport
 var fore_view: SubViewport
@@ -94,6 +98,14 @@ void fragment() {
 	mat.shader = back_shader
 	background.material = mat
 	back_layer.add_child(background)
+	# The original cliff-top picture (the far valley, the cliffs, the house across the gap with its fire, the swaying yard tree), kept as it
+	# was: here it is placed in the world at the edge of scene 1's cliff, and it fades in as he comes near.
+	surface_layer = CanvasLayer.new()
+	surface_layer.layer = -9
+	add_child(surface_layer)
+	surface_art = SurfaceArt.new()
+	surface_art.far_mode = true
+	surface_layer.add_child(surface_art)
 	mid_view = _blur_layer(back_layer, 8.0)
 	mid_blur_sprite = mid_view.get_meta(&"output_sprite") as Sprite2D
 	mid = Node2D.new()
@@ -657,9 +669,16 @@ func sync(delta: float, new_camera: float, active: bool) -> void:
 	clock += delta
 	camera_x = new_camera
 	# Act one's planes never switch off: the backdrop must flow into act two without a seam.
-	var first_act_world_animated := camera_x < 2180.0
+	var first_act_world_animated := camera_x < 2180.0 and camera_x > -200.0
+	surface_layer.visible = camera_x < -2400.0
+	if surface_layer.visible:
+		# the far cliff drifts slowly with the camera, and rises out of the picture as he goes down
+		var far_shift := Vector2(-(camera_x + 5000.0) * 0.015, -(float(level.camera_y) + 4850.0) * 0.10)
+		surface_art.set_far_placement(Vector2(430.0, 120.0) + far_shift, 0.78, 0.86)
+		surface_art.modulate.a = smoothstep(-5800.0, -4500.0, camera_x)
+		surface_art.sync(delta, 0.0, 0.0, true, 0.0)
 	water_volume.visible = camera_x < 2750.0
-	background.position.x = -90.0 - camera_x * 0.10
+	background.position.x = -90.0 - maxf(camera_x, 0.0) * 0.10
 	cone.position = Vector2(370.0 - camera_x * 0.22, -155)
 	cone_act_two.position = Vector2(370.0 + (3900.0 - camera_x) * 0.22, -155)
 	cone_act_two.modulate.a = smoothstep(2000.0, 3000.0, camera_x) * (1.0 - smoothstep(6600.0, 7300.0, camera_x))
@@ -710,6 +729,13 @@ func _draw_mid() -> void:
 		forest_rng.seed = 4242
 		for i in range(26):
 			specs.append(Vector3(2000.0 + float(i) * 150.0 + forest_rng.randf_range(-40.0, 40.0), forest_rng.randf_range(40.0, 120.0), forest_rng.randf_range(0.20, 0.34)))
+	if camera_x < -200.0:
+		# scenes 1 to 6: a stand of trunks that slide slower than the camera, without end (each one is fixed by its index)
+		var first := int(floor(camera_x * 0.29 / 92.0)) - 1
+		for i in range(first, first + 18):
+			var west_rng := RandomNumberGenerator.new()
+			west_rng.seed = i * 7919 + 13
+			specs.append(Vector3(float(i) * 92.0 + west_rng.randf_range(-30.0, 30.0), west_rng.randf_range(40.0, 120.0), west_rng.randf_range(0.20, 0.34)))
 	for spec in specs:
 		var x: float = spec.x - camera_x * 0.29
 		if x < -260.0 or x > 1540.0:
@@ -982,6 +1008,18 @@ func _draw_foreground() -> void:
 		if sx < -60.0 or sx > 1340.0:
 			continue
 		foreground.draw_colored_polygon(PackedVector2Array([Vector2(sx-width,744),Vector2(sx+lean,744-height),Vector2(sx+width,744)]),Color(0.012,0.014,0.014,0.85))
+	if camera_x < -4200.0:
+		# scenes 1 to 6: a few near trunks go past faster than the camera and frame the picture (each one fixed by its index)
+		var near_first := int(floor(camera_x * 1.14 / 900.0)) - 1
+		for i in range(near_first, near_first + 4):
+			var near_rng := RandomNumberGenerator.new()
+			near_rng.seed = i * 6151 + 5
+			var wx: float = float(i) * 900.0 + near_rng.randf_range(0.0, 600.0) - camera_x * 1.14
+			var ww: float = near_rng.randf_range(44.0, 60.0)
+			var wlean: float = near_rng.randf_range(-14.0, 14.0)
+			if wx < -200.0 or wx > 1480.0:
+				continue
+			foreground.draw_colored_polygon(PackedVector2Array([Vector2(wx - ww * 0.5, -30), Vector2(wx + ww * 0.5, -30), Vector2(wx + ww * 0.62 + wlean, 330), Vector2(wx + ww * 0.9, 744), Vector2(wx - ww * 0.9, 744), Vector2(wx - ww * 0.6 + wlean, 330)]), Color("090a0a"))
 	if camera_x > 6200.0:
 		# the forest above the lift: a few near trunks go past faster than the camera and frame the picture
 		for spec in [Vector3(8700.0, 52.0, 0.0), Vector3(9560.0, 44.0, 1.0), Vector3(10520.0, 56.0, 2.0), Vector3(11500.0, 46.0, 3.0), Vector3(12500.0, 54.0, 4.0)]:

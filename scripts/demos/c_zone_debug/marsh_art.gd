@@ -9,6 +9,7 @@ const SCREEN := Vector2(1280.0, 720.0)
 const INK := Color("050606")
 const CliffArt = preload("res://scripts/demos/c_zone_debug/cliff_art.gd")
 const ForestInk = preload("res://scripts/demos/c_zone_debug/forest_ink.gd")
+const Scene1Ink = preload("res://scripts/demos/c_zone_debug/scene1_ink.gd")
 const InkFlame = preload("res://scripts/effects/ink_flame.gd")
 const GRASS_SHADER := """shader_type canvas_item;
 // source_color: the ink must be converted like any other colour, or an HDR 2D (linear) viewport
@@ -191,7 +192,7 @@ func _ink_stage(z: int, soften: float) -> Dictionary:
 
 func sync(delta: float, new_camera_x: float, active: bool) -> void:
 	visible = active
-	var live := active and new_camera_x > 1400.0
+	var live := active and (new_camera_x > 1400.0 or new_camera_x < -200.0)
 	for stage in [back_stage, front_stage]:
 		(stage.view as SubViewport).render_target_update_mode = SubViewport.UPDATE_ALWAYS if live else SubViewport.UPDATE_DISABLED
 		(stage.sprite as Sprite2D).visible = live
@@ -470,6 +471,7 @@ func _draw_land_static() -> void:
 	_draw_set_dressing()
 	CliffArt.draw_static(self)
 	ForestInk.draw_static(self)
+	Scene1Ink.draw_static(self)
 
 const SHOULDER := 11.0
 
@@ -804,6 +806,7 @@ func _draw_grass() -> void:
 		_blade(rng, sx, slab.position.y - 0.6, rng.randf_range(4.0, 10.0), 0.8)
 	CliffArt.draw_grass(self)
 	ForestInk.draw_grass(self)
+	Scene1Ink.draw_grass(self)
 
 # On a slope the body's box cannot follow the ground, so one foot hangs in the air. Like act one's
 # hillside, every steep stretch gets a thick front band of grass that covers the feet.
@@ -1233,6 +1236,7 @@ func _draw_fog_puffs() -> void:
 			var by := 566.0 + float(k % 3) * 14.0 + sin(clock * 0.25 + float(k) * 1.7) * 4.0
 			_soft(fog, Vector2(bx, by), Vector2(300.0 + float(k % 3) * 70.0, 46.0 + float(k % 2) * 14.0), Color(0.16, 0.16, 0.155, 0.14))
 	ForestInk.draw_fog(self)
+	Scene1Ink.draw_fog(self)
 
 # ------------------------------------------------------------ effects layer
 
@@ -1241,6 +1245,7 @@ func _draw_effects() -> void:
 	_draw_crumble_dust()
 	CliffArt.draw_effects(self)
 	ForestInk.draw_effects(self)
+	Scene1Ink.draw_effects(self)
 
 # One blister on the bog: it swells as a glossy dome until about four fifths of its life, bursts,
 # and leaves an expanding ring that fades.
