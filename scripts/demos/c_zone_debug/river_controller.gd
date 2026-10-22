@@ -277,7 +277,7 @@ var hang_tilt := 0.0
 var hang_tilt_speed := 0.0
 var hang_player_on := false
 var checkpoint := 0
-var debug_return_index := 4
+var debug_return_index := 1
 var checkpoint_fan := false
 var wind_impulses := 0
 var crate_wet := false
@@ -2451,7 +2451,7 @@ func _act_finished() -> void:
 		_return_to_debug()
 
 func debug_enter_forest_act() -> void:
-	debug_return_index = 6
+	debug_return_index = 3
 	checkpoint = 5
 	checkpoint_fan = false
 	restore_checkpoint()
@@ -2470,7 +2470,7 @@ func debug_enter_forest_act() -> void:
 	_present(0.0)
 
 func debug_enter_cliff_act() -> void:
-	debug_return_index = 5
+	debug_return_index = 2
 	checkpoint = 4
 	checkpoint_fan = false
 	restore_checkpoint()

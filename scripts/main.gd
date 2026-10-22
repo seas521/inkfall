@@ -15,16 +15,17 @@ const SCREEN := Palette.SCREEN
 const PLAYER_SIZE := Palette.PLAYER_SIZE
 const INK := Palette.INK
 const PAPER := Palette.PAPER
-const MARSH_DEBUG_INDEX := 4
-const CLIFF_DEBUG_INDEX := 5
-const FOREST_DEBUG_INDEX := 6
-const MAX_DEBUG_INDEX := 6
+# The DEBUG menu: 0 = 1-01 (the surface, the shaft, then the C zone), 1 to 3 = the C zone's later acts started directly.
+const MARSH_DEBUG_INDEX := 1
+const CLIFF_DEBUG_INDEX := 2
+const FOREST_DEBUG_INDEX := 3
+const MAX_DEBUG_INDEX := 3
 const DEBUG_RETURN_META := &"inkfall_debug_return"
 const RiverTransition = preload("res://scripts/levels/level01_river_transition.gd")
 const FilmLook = preload("res://scripts/effects/film_look.gd")
 
 @export_category("DEBUG")
-@export_enum("运行时关卡菜单", "1-01 · 墨坠井", "1-02 · 风化绳崖", "1-03 · 月炉木屋与根下旧矿", "原创场景 · 沉钟雾谷", "C区第二幕 · 枯枝瘴沼", "C区第三幕 · 断桥与升降梯", "C区第四幕 · 山坡与森林（爬绳）")
+@export_enum("运行时关卡菜单", "1-01 · 墨坠井", "C区第二幕 · 枯枝瘴沼", "C区第三幕 · 断桥与升降梯", "C区第四幕 · 山坡与森林")
 var debug_start_level: int = 0
 
 var game_context = GameContext.new()
@@ -107,27 +108,26 @@ func _show_debug_selector() -> void:
 
 func _start_debug_level() -> void:
 	debug_selector_open = false
-	_activate_level(debug_selection)
+	# the menu entries start level 0 (1-01) normally, or level 0's C zone directly at a later act
+	_activate_level(0)
+	match debug_selection:
+		MARSH_DEBUG_INDEX:
+			_mount_river(false)
+			river.debug_enter_marsh_act()
+		CLIFF_DEBUG_INDEX:
+			_mount_river(false)
+			river.debug_enter_cliff_act()
+		FOREST_DEBUG_INDEX:
+			_mount_river(false)
+			river.debug_enter_forest_act()
+	queue_redraw()
 
+# `index` is the level controller (0 = 1-01; the others are the earlier prototypes the old progression still reaches)
 func _activate_level(index: int) -> void:
 	_clear_river()
 	if active_controller != null: active_controller.leave()
-	var controller_index := index
-	if index == 3:
-		controller_index = 3
-	elif index == MARSH_DEBUG_INDEX or index == CLIFF_DEBUG_INDEX or index == FOREST_DEBUG_INDEX:
-		controller_index = 0
-	active_controller = level_controllers[controller_index]
+	active_controller = level_controllers[index]
 	active_controller.enter(game_context, ui_font, self)
-	if index == MARSH_DEBUG_INDEX:
-		_mount_river(false)
-		river.debug_enter_marsh_act()
-	elif index == CLIFF_DEBUG_INDEX:
-		_mount_river(false)
-		river.debug_enter_cliff_act()
-	elif index == FOREST_DEBUG_INDEX:
-		_mount_river(false)
-		river.debug_enter_forest_act()
 	queue_redraw()
 
 func _begin_river_transition() -> void:
@@ -202,8 +202,8 @@ func _draw() -> void:
 func _draw_debug_selector() -> void:
 	draw_string(ui_font, Vector2(72.0, 92.0), "INKFALL · DEBUG", HORIZONTAL_ALIGNMENT_LEFT, -1.0, 30, INK)
 	draw_string(ui_font, Vector2(74.0, 128.0), "关卡测试入口", HORIZONTAL_ALIGNMENT_LEFT, -1.0, 16, Color(INK, 0.58))
-	var titles := ["DEBUG · 1-01 · 墨坠井", "DEBUG · 1-02 · 风化绳崖", "DEBUG · 1-03 · 月炉木屋与根下旧矿", "DEMO · 原创场景 · 沉钟雾谷", "DEBUG · C区第二幕 · 枯枝瘴沼", "DEBUG · C区第三幕 · 断桥与升降梯", "DEBUG · C区第四幕 · 山坡与森林（爬绳）"]
-	var details := ["悬崖井口 → 火焰竖井 → 雾岸渡水 → 枯枝瘴沼", "双崖上层 → 滚石收绳 → 架绳攀爬 → 盾行山洞 → 对岸木屋", "木屋求救声 → 三相结界 → 坠入旧矿 → 绳索与十字镐 → 营救魔法师", "独立场景 → 多平面视差 → 电影景深 → 自由移动", "高台木箱 → 大树秋千 → 毒气石柱 → 落石与喷火", "投石砸断吊桥绳 → 过桥 → 带石上升降梯 → 砸断配重绳 → 升上悬崖", "升降梯之上的山坡 → 低垂的练习绳（跳起抓住，上下爬，左右摆，空格松手）"]
+	var titles := ["DEBUG · 1-01 · 墨坠井", "DEBUG · C区第二幕 · 枯枝瘴沼", "DEBUG · C区第三幕 · 断桥与升降梯", "DEBUG · C区第四幕 · 山坡与森林"]
+	var details := ["悬崖井口 → 火焰竖井 → 雾岸渡水 → 枯枝瘴沼 → 断桥与升降梯 → 森林", "高台木箱 → 大树秋千 → 毒气石柱 → 落石与喷火", "投石砸断吊桥绳 → 过桥 → 带石上升降梯 → 砸断配重绳 → 升上悬崖", "升降梯之上的山坡 → 森林的第一个房间（目前只有美术和绳）"]
 	for index in titles.size():
 		var rect := Rect2(72.0, 140.0 + float(index) * 70.0, 1040.0, 62.0)
 		var selected := index == debug_selection
