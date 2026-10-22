@@ -424,7 +424,7 @@ func presentation_state() -> Dictionary:
 		"light_exposure": 0.38 if room == Room.SURFACE else 0.18,
 		"small_item_kind": item_kind,
 		"small_item_radius": item_radius,
-		"visual_scale": 0.78 if room == Room.SURFACE else 1.0,
+		"visual_scale": 0.90,  # the same everywhere: the C zone's size (he was 0.78 on the surface and 1.0 in the shaft)
 		"fog_blur": _surface_actor_fog_blur() if room == Room.SURFACE else 0.0,
 		"monochrome": room == Room.CAVERN or room == Room.LEVEL_01_LIFT,
 		"clip_flip_h": _shaft_entry_clip_flip(),

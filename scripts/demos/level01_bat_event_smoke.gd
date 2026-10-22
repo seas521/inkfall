@@ -12,6 +12,7 @@ func _initialize() -> void:
 
 func _run() -> void:
 	var main = MAIN_SCENE.instantiate()
+	main.debug_start_level = 1  # the project may be set to start in another act for play-testing
 	root.add_child(main)
 	await _frames(4)
 	var controller = main.active_controller

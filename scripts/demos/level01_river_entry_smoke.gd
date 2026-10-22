@@ -60,7 +60,7 @@ func _run() -> void:
 	main._show_debug_selector()
 	await _frames(3)
 	_check(main.river == null and root.canvas_transform.is_equal_approx(Transform2D.IDENTITY), "menu exit clears the river camera")
-	main.debug_selection = 4
+	main.debug_selection = main.MARSH_DEBUG_INDEX
 	main._start_debug_level()
 	await _frames(4)
 	_check(
@@ -70,10 +70,10 @@ func _run() -> void:
 		"dedicated act-two entry starts at the marsh high ledge"
 	)
 	main._show_debug_selector()
-	main.debug_selection = 1
+	main.debug_selection = 0
 	main._start_debug_level()
 	await _frames(3)
-	_check(main.active_controller == main.level_controllers[1] and main.river == null, "other levels still open normally")
+	_check(main.active_controller == main.level_controllers[0] and main.river == null, "1-01 opens normally from the menu")
 	main.queue_free()
 	await _frames(3)
 	print("level01_river_entry_smoke: %s" % ("PASS" if failures == 0 else "FAIL"))
