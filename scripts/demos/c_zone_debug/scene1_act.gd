@@ -35,17 +35,27 @@ const FEATURES := [
 	{"t": "spikes", "x": 4220.0, "w": 84.0},
 	{"t": "log", "x": 4400.0, "len": 170.0, "h": 66.0},
 	{"t": "pond", "x": 4760.0, "w": 400.0, "d": 60.0},
-	{"t": "rock", "x": 4880.0, "w": 66.0, "top": 22.0, "seed": 4},
-	{"t": "rock", "x": 4990.0, "w": 70.0, "top": 30.0, "seed": 5},
-	{"t": "rock", "x": 5100.0, "w": 66.0, "top": 20.0, "seed": 6},
+	{"t": "rock", "x": 4880.0, "w": 52.0, "top": 15.0, "seed": 4},
+	{"t": "rock", "x": 4995.0, "w": 80.0, "top": 28.0, "seed": 5},
+	{"t": "rock", "x": 5115.0, "w": 58.0, "top": 19.0, "seed": 6},
 	{"t": "pit", "x": 5430.0, "w": 112.0},
 	{"t": "log", "x": 5700.0, "len": 250.0, "h": 108.0},
 	{"t": "mound", "x": 6080.0, "w": 150.0, "h": 46.0},
 	{"t": "mound", "x": 6270.0, "w": 170.0, "h": 78.0},
 	{"t": "spikes", "x": 6520.0, "w": 90.0},
 	{"t": "boulder", "x": 6760.0, "top": 56.0, "bottom": 130.0, "h": 84.0, "seed": 2},
+	# low hummocks between the obstacles, so that the ground is never a ruler line (these come last: the tests count the others by kind)
+	{"t": "mound", "x": 300.0, "w": 110.0, "h": 16.0},
+	{"t": "mound", "x": 1235.0, "w": 85.0, "h": 14.0},
+	{"t": "mound", "x": 2430.0, "w": 80.0, "h": 14.0},
+	{"t": "mound", "x": 3345.0, "w": 90.0, "h": 16.0},
+	{"t": "mound", "x": 4130.0, "w": 90.0, "h": 14.0},
+	{"t": "mound", "x": 4600.0, "w": 80.0, "h": 16.0},
+	{"t": "mound", "x": 5290.0, "w": 85.0, "h": 14.0},
+	{"t": "mound", "x": 5960.0, "w": 100.0, "h": 18.0},
 ]
 
+const LOG_TAPER := 0.84  # height of a fallen tree's thin end compared with its root end
 const PIT_SPIKES_DEPTH := 70.0  # how far down the spikes are at the bottom of a pit
 const WaterPool = preload("res://scripts/demos/c_zone_debug/water_pool.gd")
 const LIE_TIME := 1.4  # lying still
@@ -161,13 +171,11 @@ func _ready() -> void:
 			poly.polygon = boulder_points(f)
 			body.add_child(poly)
 		elif t == "log":
-			var shape2 := CollisionShape2D.new()
-			var rect := RectangleShape2D.new()
-			var h := float(f["h"])
-			rect.size = Vector2(float(f["len"]), h)
-			shape2.shape = rect
-			shape2.position = Vector2(fx(f) + float(f["len"]) * 0.5, GROUND_Y - h * 0.5 + 4.0)
-			body.add_child(shape2)
+			# a tapering trunk: thick at the root end, 16% lower at the broken end
+			var poly2 := CollisionPolygon2D.new()
+			var lx := fx(f)
+			poly2.polygon = PackedVector2Array([Vector2(lx, GROUND_Y + 6.0), Vector2(lx, GROUND_Y - float(f["h"])), Vector2(lx + float(f["len"]), GROUND_Y - float(f["h"]) * LOG_TAPER), Vector2(lx + float(f["len"]), GROUND_Y + 6.0)])
+			body.add_child(poly2)
 		elif t == "rock":
 			var shape3 := CollisionShape2D.new()
 			var rect3 := RectangleShape2D.new()

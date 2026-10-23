@@ -56,8 +56,6 @@ var cone_act_two: ColorRect
 var cone_forest: ColorRect
 var surface_layer: CanvasLayer
 var surface_art: Node2D
-var forest_veil_layer: CanvasLayer
-var forest_veil: Sprite2D
 var fan_pickup: Node2D
 var mid_view: SubViewport
 var fore_view: SubViewport
@@ -80,6 +78,13 @@ func _ready() -> void:
 	background.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS
 	var back_shader := Shader.new()
 	back_shader.code = """shader_type canvas_item;
+uniform float reveal_edge = 2.0;
+uniform float reveal_soft = 0.34;
+float hash21(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
+float vnoise(vec2 p) {
+	vec2 i = floor(p); vec2 f = fract(p); f = f * f * (3.0 - 2.0 * f);
+	return mix(mix(hash21(i), hash21(i + vec2(1.0, 0.0)), f.x), mix(hash21(i + vec2(0.0, 1.0)), hash21(i + vec2(1.0, 1.0)), f.x), f.y);
+}
 void fragment() {
 	// A real 5x5 gaussian (sigma about 1.3 texels). The earlier 5-tap cross left four shifted
 	// copies of every hard edge, which showed up as stepped bands beside the trunks.
@@ -94,7 +99,12 @@ void fragment() {
 	}
 	c /= total;
 	float v = dot(c.rgb, vec3(0.299, 0.587, 0.114));
-	COLOR = vec4(vec3(v * 0.83 + 0.075), 1.0);
+	// the cut-away: a ragged fog front sweeping from the right to the left across the screen (lower down it runs ahead, like a clearing)
+	// (it opens column by column, like gaps between trunks, not as one straight curtain)
+	float columns = (vnoise(vec2(SCREEN_UV.x * 16.0, 1.0)) - 0.5) * 0.34 + (vnoise(vec2(SCREEN_UV.x * 5.0, UV.y * 3.0)) - 0.5) * 0.22;
+	float front = reveal_edge + (vnoise(vec2(UV.y * 5.0, 3.0)) - 0.5) * 0.28 + (UV.y - 0.5) * 0.18;
+	float keep = 1.0 - smoothstep(front - reveal_soft, front + reveal_soft, SCREEN_UV.x + columns);
+	COLOR = vec4(vec3(v * 0.83 + 0.075), keep);
 }"""
 	var mat := ShaderMaterial.new()
 	mat.shader = back_shader
@@ -103,23 +113,11 @@ void fragment() {
 	# The original cliff-top picture (the far valley, the cliffs, the house across the gap with its fire, the swaying yard tree), kept as it
 	# was: here it is placed in the world at the edge of scene 1's cliff, and it fades in as he comes near.
 	surface_layer = CanvasLayer.new()
-	surface_layer.layer = -9
+	surface_layer.layer = -11  # behind the forest backdrop, which is cut away to uncover it
 	add_child(surface_layer)
 	surface_art = SurfaceArt.new()
 	surface_art.far_mode = true
 	surface_layer.add_child(surface_art)
-	# The forest backdrop once more, above the far valley: it thins out to nothing as he comes out of the trees, uncovering the valley
-	forest_veil_layer = CanvasLayer.new()
-	forest_veil_layer.layer = -8
-	add_child(forest_veil_layer)
-	forest_veil = Sprite2D.new()
-	forest_veil.centered = false
-	forest_veil.texture = BACKGROUND
-	forest_veil.scale = background.scale
-	forest_veil.position = background.position
-	forest_veil.texture_filter = background.texture_filter
-	forest_veil.material = background.material
-	forest_veil_layer.add_child(forest_veil)
 	mid_view = _blur_layer(back_layer, 8.0)
 	mid_blur_sprite = mid_view.get_meta(&"output_sprite") as Sprite2D
 	mid = Node2D.new()
@@ -681,7 +679,7 @@ void fragment() {
 # 0 deep in the forest, 1 when he steps out of the trees onto the open ground: the dark forest backdrop gives way to the wide valley
 # as the trunks thin out (the trees along the route end where this reaches 1).
 func _emergence() -> float:
-	return smoothstep(-6100.0, -5250.0, camera_x)
+	return smoothstep(-6700.0, -4900.0, camera_x)
 
 func sync(delta: float, new_camera: float, active: bool) -> void:
 	visible = active
@@ -690,10 +688,9 @@ func sync(delta: float, new_camera: float, active: bool) -> void:
 	# Act one's planes never switch off: the backdrop must flow into act two without a seam.
 	var first_act_world_animated := camera_x < 2180.0 and camera_x > -200.0
 	var emergence := _emergence()
-	surface_layer.visible = camera_x < -2400.0 and emergence > 0.001
-	forest_veil_layer.visible = surface_layer.visible and emergence < 0.999
-	forest_veil.modulate.a = 1.0 - emergence
-	forest_veil.position = background.position
+	surface_layer.visible = camera_x < -2400.0
+	# the forest backdrop is cut away from the right, so the valley opens up ahead of him before the trees are gone
+	(background.material as ShaderMaterial).set_shader_parameter("reveal_edge", lerpf(1.55, -0.35, emergence) if camera_x < -2400.0 else 2.0)
 	if surface_layer.visible:
 		# the far cliff drifts slowly with the camera, and rises out of the picture as he goes down
 		var far_shift := Vector2(-(camera_x + 5000.0) * 0.015, -(float(level.camera_y) + 4850.0) * 0.10)
@@ -757,7 +754,9 @@ func _draw_mid() -> void:
 		for i in range(first, first + 18):
 			var west_rng := RandomNumberGenerator.new()
 			west_rng.seed = i * 7919 + 13
-			specs.append(Vector3(float(i) * 92.0 + west_rng.randf_range(-30.0, 30.0), west_rng.randf_range(40.0, 120.0), west_rng.randf_range(0.20, 0.34)))
+			var mid_x := float(i) * 92.0 + west_rng.randf_range(-30.0, 30.0)
+			if mid_x < -230.0:  # none beyond this: the last one comes in from the right edge as the backdrop opens, then there are no more
+				specs.append(Vector3(mid_x, west_rng.randf_range(40.0, 120.0), west_rng.randf_range(0.20, 0.34)))
 	for spec in specs:
 		var x: float = spec.x - camera_x * 0.29
 		if x < -260.0 or x > 1540.0:
@@ -1030,16 +1029,19 @@ func _draw_foreground() -> void:
 		if sx < -60.0 or sx > 1340.0:
 			continue
 		foreground.draw_colored_polygon(PackedVector2Array([Vector2(sx-width,744),Vector2(sx+lean,744-height),Vector2(sx+width,744)]),Color(0.012,0.014,0.014,0.85))
-	if camera_x < -5300.0:
-		# scenes 1 to 6: a few near trunks go past faster than the camera and frame the picture (each one fixed by its index)
+	if camera_x < -2000.0:
+		# scenes 1 to 6: a few near trunks go past faster than the camera and frame the picture (each one fixed by its index). They stop
+		# at world 'w' -5550: the last one comes in from the right edge when the backdrop begins to open, and the later ones simply do
+		# not exist, so nothing pops in or out of the middle of the picture.
 		var near_first := int(floor(camera_x * 1.14 / 900.0)) - 1
 		for i in range(near_first, near_first + 4):
 			var near_rng := RandomNumberGenerator.new()
 			near_rng.seed = i * 6151 + 5
-			var wx: float = float(i) * 900.0 + near_rng.randf_range(0.0, 600.0) - camera_x * 1.14
+			var world_w: float = float(i) * 900.0 + near_rng.randf_range(0.0, 600.0)
+			var wx: float = world_w - camera_x * 1.14
 			var ww: float = near_rng.randf_range(44.0, 60.0)
 			var wlean: float = near_rng.randf_range(-14.0, 14.0)
-			if wx < -200.0 or wx > 1480.0:
+			if world_w > -5550.0 or wx < -200.0 or wx > 1480.0:
 				continue
 			foreground.draw_colored_polygon(PackedVector2Array([Vector2(wx - ww * 0.5, -30), Vector2(wx + ww * 0.5, -30), Vector2(wx + ww * 0.62 + wlean, 330), Vector2(wx + ww * 0.9, 744), Vector2(wx - ww * 0.9, 744), Vector2(wx - ww * 0.6 + wlean, 330)]), Color("090a0a"))
 	if camera_x > 6200.0:

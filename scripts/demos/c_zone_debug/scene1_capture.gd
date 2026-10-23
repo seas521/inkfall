@@ -4,12 +4,13 @@ extends SceneTree
 const SCENE = preload("res://scenes/debug/c_zone_river.tscn")
 const Scene1 = preload("res://scripts/demos/c_zone_debug/scene1_act.gd")
 var level
+var TAG := OS.get_environment("S1_TAG") if OS.has_environment("S1_TAG") else ""
 
 func _initialize() -> void:
 	call_deferred("_run")
 
 # `offset`: along the route (px from where he lies); the camera is centred 200 px ahead of him
-func _shot(name: String, offset: float, intro: float, lead := 200.0) -> void:
+func _shot(shot_name: String, offset: float, intro: float, lead := 200.0) -> void:
 	var px: float = Scene1.START_X + offset
 	var gy: float = Scene1.ground_top(px)
 	level.player.position = Vector2(px - 13.0, gy - 56.0)
@@ -27,14 +28,14 @@ func _shot(name: String, offset: float, intro: float, lead := 200.0) -> void:
 	RenderingServer.force_draw()
 	DirAccess.make_dir_recursive_absolute("res://artifacts/scene1")
 	var shot: Image = root.get_texture().get_image()
-	shot.save_png("res://artifacts/scene1/%s.png" % name)
+	shot.save_png("res://artifacts/scene1/%s%s.png" % [TAG, shot_name])
 	var zoom := shot.get_region(Rect2i(250, 470, 700, 190))
 	zoom.resize(1400, 380, Image.INTERPOLATE_LANCZOS)
-	zoom.save_png("res://artifacts/scene1/%s_zoom.png" % name)
+	zoom.save_png("res://artifacts/scene1/%s%s_zoom.png" % [TAG, shot_name])
 	level.set_physics_process(true)
 
 # Whatever is happening now (he keeps walking): the camera follows him
-func _snap(name: String) -> void:
+func _snap(shot_name: String) -> void:
 	level.set_physics_process(false)
 	var px: float = level.player.position.x + 13.0
 	level.camera_x = px + 200.0 - 640.0
@@ -45,10 +46,10 @@ func _snap(name: String) -> void:
 		await process_frame
 	RenderingServer.force_draw()
 	var shot: Image = root.get_texture().get_image()
-	shot.save_png("res://artifacts/scene1/%s.png" % name)
+	shot.save_png("res://artifacts/scene1/%s%s.png" % [TAG, shot_name])
 	var zoom := shot.get_region(Rect2i(250, 470, 700, 190))
 	zoom.resize(1400, 380, Image.INTERPOLATE_LANCZOS)
-	zoom.save_png("res://artifacts/scene1/%s_zoom.png" % name)
+	zoom.save_png("res://artifacts/scene1/%s%s_zoom.png" % [TAG, shot_name])
 	level.set_physics_process(true)
 
 func _run() -> void:
@@ -62,6 +63,10 @@ func _run() -> void:
 	for i in 30:
 		await physics_frame
 	await _shot("a_lying", 0.0, 0.3)
+	await _shot("m_4400", 4400.0, 9.0)
+	await _shot("m_4900", 4900.0, 9.0)
+	await _shot("m_5300", 5300.0, 9.0)
+	await _shot("m_5700", 5700.0, 9.0)
 	# wading through the first pond
 	var px: float = Scene1.START_X + 2560.0 - 60.0
 	level.player.position = Vector2(px - 13.0, Scene1.ground_top(px) - 56.0)
