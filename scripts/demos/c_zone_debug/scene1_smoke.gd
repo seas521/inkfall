@@ -1,6 +1,6 @@
 extends SceneTree
 
-# Scene 1 (headless): he lies, gets up, runs; mounds, pits, boulders, ponds and the trunk can be crossed.
+# Scene 1 (headless): he lies, gets up, runs; pits, thorns, a boulder, a pond and logs can be crossed.
 const SCENE = preload("res://scenes/debug/c_zone_river.tscn")
 const Scene1 = preload("res://scripts/demos/c_zone_debug/scene1_act.gd")
 var level
@@ -73,18 +73,6 @@ func _run() -> void:
 	_check(absf(level.player.position.x - x0) < 1.0, "while he lies he cannot be moved")
 	await _frames(240)
 	_check(not level.scene1.locks_move(), "after the get-up the controls are his")
-	# a mound: he runs over it and stays on the ground
-	var mound := _feature("mound", 0)
-	_put(float(mound["x"]) - 330.0)
-	await _frames(20)
-	Input.action_press("move_right")
-	var on_top := false
-	for i in 240:
-		await physics_frame
-		if absf(level.player.position.x + 13.0 - Scene1.fx(mound)) < 20.0 and level.player.is_on_floor():
-			on_top = absf(_feet().y - Scene1.ground_top(Scene1.fx(mound))) < 4.0
-	Input.action_release("move_right")
-	_check(on_top, "he runs up over the mound and stands on its top")
 	# the first pit (78 wide, spikes at the bottom): a running jump clears it
 	var pit := _feature("pit", 0)
 	_put(float(pit["x"]) - 150.0)
@@ -189,13 +177,13 @@ func _run() -> void:
 	Input.action_release("move_right")
 	_check(level.player.position.x > Scene1.fx(log_feature) + float(log_feature["len"]) and level.player.is_on_floor(), "the low fallen tree can be climbed over (x %.0f)" % level.player.position.x)
 	# nothing to the west but forest: he runs left as far as the world lets him and just stops (no cliff, no fall)
-	_put(-1200.0)
-	level.player.position.x = -11500.0
-	level.player.position.y = Scene1.ground_top(-11500.0) - 56.0
+	var west_x: float = level.WORLD_MIN_X + 500.0
+	level.player.position = Vector2(west_x, Scene1.ground_top(west_x) - 56.0)
+	level.player.velocity = Vector2.ZERO
 	await _frames(10)
 	Input.action_press("move_left")
 	await _frames(200)
 	Input.action_release("move_left")
-	_check(level.player.is_on_floor() and level.player.position.x >= Scene1.WORLD_LEFT and level.marsh_hit_time <= 0.0, "running west he is stopped by the forest, not by a cliff (x %.0f)" % level.player.position.x)
+	_check(level.player.is_on_floor() and level.player.position.x >= level.WORLD_MIN_X and level.marsh_hit_time <= 0.0, "running west he is stopped by the forest, not by a cliff (x %.0f)" % level.player.position.x)
 	print("scene 1 smoke OK" if failures == 0 else "scene 1 smoke: %d FAILED" % failures)
 	quit()

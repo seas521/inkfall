@@ -79,6 +79,7 @@ func _ready() -> void:
 	var back_shader := Shader.new()
 	back_shader.code = """shader_type canvas_item;
 uniform float reveal_edge = 2.0;
+uniform float calm = 0.0;
 uniform float reveal_soft = 0.34;
 float hash21(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
 float vnoise(vec2 p) {
@@ -104,6 +105,7 @@ void fragment() {
 	float columns = (vnoise(vec2(SCREEN_UV.x * 16.0, 1.0)) - 0.5) * 0.34 + (vnoise(vec2(SCREEN_UV.x * 5.0, UV.y * 3.0)) - 0.5) * 0.22;
 	float front = reveal_edge + (vnoise(vec2(UV.y * 5.0, 3.0)) - 0.5) * 0.28 + (UV.y - 0.5) * 0.18;
 	float keep = 1.0 - smoothstep(front - reveal_soft, front + reveal_soft, SCREEN_UV.x + columns);
+	v = mix(v, 0.40, 0.55 * calm) * mix(1.0, 0.80, calm);  // scene 1: the backdrop is calmer (less contrast), so what matters stands out
 	COLOR = vec4(vec3(v * 0.83 + 0.075), keep);
 }"""
 	var mat := ShaderMaterial.new()
@@ -679,7 +681,7 @@ void fragment() {
 # 0 deep in the forest, 1 when he steps out of the trees onto the open ground: the dark forest backdrop gives way to the wide valley
 # as the trunks thin out (the trees along the route end where this reaches 1).
 func _emergence() -> float:
-	return smoothstep(-6700.0, -4900.0, camera_x)
+	return smoothstep(-6000.0, -4800.0, camera_x)
 
 func sync(delta: float, new_camera: float, active: bool) -> void:
 	visible = active
@@ -690,6 +692,7 @@ func sync(delta: float, new_camera: float, active: bool) -> void:
 	var emergence := _emergence()
 	surface_layer.visible = camera_x < -2400.0
 	# the forest backdrop is cut away from the right, so the valley opens up ahead of him before the trees are gone
+	(background.material as ShaderMaterial).set_shader_parameter("calm", 1.0 - smoothstep(-2600.0, -1200.0, camera_x))
 	(background.material as ShaderMaterial).set_shader_parameter("reveal_edge", lerpf(1.55, -0.35, emergence) if camera_x < -2400.0 else 2.0)
 	if surface_layer.visible:
 		# the far cliff drifts slowly with the camera, and rises out of the picture as he goes down
@@ -1002,7 +1005,46 @@ func _draw_struggle_splash(impact: Dictionary) -> void:
 		surface.draw_line(point, point-tail, Color(shade,shade,shade,alpha), drop.radius*1.5, true)
 		surface.draw_circle(point, drop.radius, Color(shade,shade,shade,alpha), true, -1.0, true)
 
+# Scenes 1 to 6, the nearest layer: tall dark grass and fern fronds along the bottom edge and a few thin drooping branches along the
+# top edge (blurred by this layer): the feeling of being inside the forest, without anything in the way. Finite sets (the last one
+# comes in from the right edge as the backdrop opens) so nothing pops.
+func _draw_forest_frame() -> void:
+	if camera_x > -2000.0:
+		return
+	var fade := 1.0 - _emergence()
+	if fade <= 0.01:
+		return
+	var ink := Color(0.012, 0.014, 0.014, 0.92 * fade)
+	var first := int(floor(camera_x * 1.25 / 38.0)) - 2
+	for i in range(first, first + 40):
+		var r := RandomNumberGenerator.new()
+		r.seed = i * 4099 + 7
+		var wx := float(i) * 38.0 + r.randf_range(0.0, 30.0)
+		if wx > 1400.0 - 6000.0 * 1.25 or r.randf() < 0.38:
+			continue
+		var sx := wx - camera_x * 1.25
+		for blade in range(r.randi_range(2, 4)):
+			var h := r.randf_range(34.0, 118.0)
+			var lean := r.randf_range(-36.0, 36.0)
+			var bx := sx + float(blade) * r.randf_range(4.0, 9.0)
+			foreground.draw_colored_polygon(PackedVector2Array([Vector2(bx - 4.0, 744), Vector2(bx - 2.0 + lean * 0.3, 744.0 - h * 0.55), Vector2(bx + lean, 744.0 - h), Vector2(bx + 2.5 + lean * 0.3, 744.0 - h * 0.55), Vector2(bx + 4.0, 744)]), ink)
+	var top_first := int(floor(camera_x * 1.12 / 420.0)) - 1
+	for i in range(top_first, top_first + 5):
+		var r2 := RandomNumberGenerator.new()
+		r2.seed = i * 7121 + 3
+		var wx2 := float(i) * 420.0 + r2.randf_range(0.0, 300.0)
+		if wx2 > 1400.0 - 6000.0 * 1.12 or r2.randf() < 0.3:
+			continue
+		var tx := wx2 - camera_x * 1.12
+		var length := r2.randf_range(70.0, 190.0)
+		var sway := r2.randf_range(-50.0, 50.0)
+		var pts := PackedVector2Array([Vector2(tx - 3.0, -20), Vector2(tx + sway * 0.4, length * 0.5), Vector2(tx + sway, length), Vector2(tx + sway * 0.4 + 3.0, length * 0.5), Vector2(tx + 3.0, -20)])
+		foreground.draw_colored_polygon(pts, ink)
+		var fork := Vector2(tx + sway * 0.4, length * 0.5)
+		foreground.draw_colored_polygon(PackedVector2Array([fork + Vector2(-2, 0), fork + Vector2(r2.randf_range(-60.0, 60.0), length * 0.35), fork + Vector2(2, 0)]), ink)
+
 func _draw_foreground() -> void:
+	_draw_forest_frame()
 	var x := -70.0 - camera_x*1.10
 	if x > -260.0:
 		foreground.draw_colored_polygon(PackedVector2Array([Vector2(x-40,-30),Vector2(x+116,-30),Vector2(x+96,150),Vector2(x+55,345),Vector2(x+35,540),Vector2(x-25,590)]),Color("090a0a"))
@@ -1029,21 +1071,6 @@ func _draw_foreground() -> void:
 		if sx < -60.0 or sx > 1340.0:
 			continue
 		foreground.draw_colored_polygon(PackedVector2Array([Vector2(sx-width,744),Vector2(sx+lean,744-height),Vector2(sx+width,744)]),Color(0.012,0.014,0.014,0.85))
-	if camera_x < -2000.0:
-		# scenes 1 to 6: a few near trunks go past faster than the camera and frame the picture (each one fixed by its index). They stop
-		# at world 'w' -5550: the last one comes in from the right edge when the backdrop begins to open, and the later ones simply do
-		# not exist, so nothing pops in or out of the middle of the picture.
-		var near_first := int(floor(camera_x * 1.14 / 900.0)) - 1
-		for i in range(near_first, near_first + 4):
-			var near_rng := RandomNumberGenerator.new()
-			near_rng.seed = i * 6151 + 5
-			var world_w: float = float(i) * 900.0 + near_rng.randf_range(0.0, 600.0)
-			var wx: float = world_w - camera_x * 1.14
-			var ww: float = near_rng.randf_range(44.0, 60.0)
-			var wlean: float = near_rng.randf_range(-14.0, 14.0)
-			if world_w > -5550.0 or wx < -200.0 or wx > 1480.0:
-				continue
-			foreground.draw_colored_polygon(PackedVector2Array([Vector2(wx - ww * 0.5, -30), Vector2(wx + ww * 0.5, -30), Vector2(wx + ww * 0.62 + wlean, 330), Vector2(wx + ww * 0.9, 744), Vector2(wx - ww * 0.9, 744), Vector2(wx - ww * 0.6 + wlean, 330)]), Color("090a0a"))
 	if camera_x > 6200.0:
 		# the forest above the lift: a few near trunks go past faster than the camera and frame the picture
 		for spec in [Vector3(8700.0, 52.0, 0.0), Vector3(9560.0, 44.0, 1.0), Vector3(10520.0, 56.0, 2.0), Vector3(11500.0, 46.0, 3.0), Vector3(12500.0, 54.0, 4.0)]:

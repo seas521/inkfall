@@ -8,9 +8,9 @@ extends Node2D
 # This file: the ground, the obstacles, the start (lying, getting up). The drawing is in scene1_ink.gd (marsh_art's ink stage), from
 # the same data. Coordinates are world coordinates (y up is negative).
 
-const START_X := -10400.0  # where he lies
+const START_X := -7300.0  # where he lies
 const GROUND_Y := -4300.0  # the ground's surface
-const WORLD_LEFT := -12800.0  # the ground and the forest go on well past the point he can run to (the world edge at -12000)
+const WORLD_LEFT := -9700.0  # the ground and the forest go on well past the point he can run to (the world edge at -8500)
 const CLIFF_X := -3500.0  # the cliff edge: the ground ends here
 const PLAYER_SIZE := Vector2(26.0, 54.0)
 
@@ -23,36 +23,12 @@ const PLAYER_SIZE := Vector2(26.0, 54.0)
 #   rock    a rock at an absolute height (stepping stones in ponds): x = centre, w, top = height above GROUND_Y (negative = below)
 #   log     a fallen tree he can jump onto: x = start, len, h
 const FEATURES := [
-	{"t": "mound", "x": 700.0, "w": 210.0, "h": 42.0},
-	{"t": "pit", "x": 1050.0, "w": 98.0},
-	{"t": "log", "x": 1420.0, "len": 190.0, "h": 58.0},
-	{"t": "mound", "x": 1850.0, "w": 250.0, "h": 96.0},
-	{"t": "spikes", "x": 2230.0, "w": 96.0},
-	{"t": "pond", "x": 2560.0, "w": 340.0, "d": 52.0},
-	{"t": "pit", "x": 3080.0, "w": 128.0, "island": true},
-	{"t": "boulder", "x": 3520.0, "top": 64.0, "bottom": 150.0, "h": 98.0, "seed": 1},
-	{"t": "mound", "x": 3880.0, "w": 200.0, "h": 70.0},
-	{"t": "spikes", "x": 4220.0, "w": 84.0},
-	{"t": "log", "x": 4400.0, "len": 170.0, "h": 66.0},
-	{"t": "pond", "x": 4760.0, "w": 400.0, "d": 60.0},
-	{"t": "rock", "x": 4880.0, "w": 52.0, "top": 15.0, "seed": 4},
-	{"t": "rock", "x": 4995.0, "w": 80.0, "top": 28.0, "seed": 5},
-	{"t": "rock", "x": 5115.0, "w": 58.0, "top": 19.0, "seed": 6},
-	{"t": "pit", "x": 5430.0, "w": 112.0},
-	{"t": "log", "x": 5700.0, "len": 250.0, "h": 108.0},
-	{"t": "mound", "x": 6080.0, "w": 150.0, "h": 46.0},
-	{"t": "mound", "x": 6270.0, "w": 170.0, "h": 78.0},
-	{"t": "spikes", "x": 6520.0, "w": 90.0},
-	{"t": "boulder", "x": 6760.0, "top": 56.0, "bottom": 130.0, "h": 84.0, "seed": 2},
-	# low hummocks between the obstacles, so that the ground is never a ruler line (these come last: the tests count the others by kind)
-	{"t": "mound", "x": 300.0, "w": 110.0, "h": 16.0},
-	{"t": "mound", "x": 1235.0, "w": 85.0, "h": 14.0},
-	{"t": "mound", "x": 2430.0, "w": 80.0, "h": 14.0},
-	{"t": "mound", "x": 3345.0, "w": 90.0, "h": 16.0},
-	{"t": "mound", "x": 4130.0, "w": 90.0, "h": 14.0},
-	{"t": "mound", "x": 4600.0, "w": 80.0, "h": 16.0},
-	{"t": "mound", "x": 5290.0, "w": 85.0, "h": 14.0},
-	{"t": "mound", "x": 5960.0, "w": 100.0, "h": 18.0},
+	{"t": "pit", "x": 700.0, "w": 100.0},
+	{"t": "log", "x": 1250.0, "len": 210.0, "h": 60.0},
+	{"t": "spikes", "x": 1800.0, "w": 96.0},
+	{"t": "pond", "x": 2250.0, "w": 320.0, "d": 40.0},
+	{"t": "boulder", "x": 2900.0, "top": 70.0, "bottom": 150.0, "h": 96.0, "seed": 3},
+	{"t": "pit", "x": 3350.0, "w": 128.0, "island": true},
 ]
 
 const LOG_TAPER := 0.84  # height of a fallen tree's thin end compared with its root end
@@ -69,28 +45,44 @@ var pools: Array = []
 var previous_feet_y := 0.0
 
 static func spawn_position() -> Vector2:
-	return Vector2(START_X - PLAYER_SIZE.x * 0.5, GROUND_Y - PLAYER_SIZE.y - 2.0)
+	return Vector2(START_X - PLAYER_SIZE.x * 0.5, ground_top(START_X) - PLAYER_SIZE.y - 2.0)
 
 static func fx(feature: Dictionary) -> float:
 	return START_X + float(feature["x"])
 
-# The ground's surface at x: level, plus the mounds, minus the ponds.
+# How far the open ground rises and falls at x (px, up is negative): a slow swell of a few pixels, with smaller ripples on it. It is
+# flat at the start and wherever there is an obstacle (those are placed on the level ground GROUND_Y).
+static func swell(x: float) -> float:
+	var s := sin(x * 0.0071 + 0.8) * 7.0 + sin(x * 0.0173 + 2.1) * 3.6 + sin(x * 0.041 + 0.3) * 1.3
+	return s * flat_mask(x)
+
+static func flat_mask(x: float) -> float:
+	var mask := smoothstep(START_X - 40.0, START_X + 360.0, x)  # level where he lies
+	for f: Dictionary in FEATURES:
+		var from := fx(f)
+		var to := from
+		match String(f["t"]):
+			"boulder":
+				from -= float(f["bottom"]) * 0.7
+				to += float(f["bottom"]) * 0.7
+			"log":
+				to += float(f["len"])
+			"spikes", "pit", "pond":
+				to += float(f["w"])
+		var near := smoothstep(from - 150.0, from - 20.0, x) * (1.0 - smoothstep(to + 20.0, to + 150.0, x))
+		mask *= 1.0 - near
+	return mask
+
+# The ground's surface at x: gently rolling, minus the ponds.
 static func ground_top(x: float) -> float:
-	var y := GROUND_Y
+	var y := GROUND_Y + swell(x)
 	for f: Dictionary in FEATURES:
 		var t := String(f["t"])
-		if t == "mound":
-			var w := float(f["w"])
-			var dx := absf(x - fx(f))
-			if dx < w:
-				var k := 1.0 - dx / w
-				y -= float(f["h"]) * (0.5 - 0.5 * cos(PI * k))
-		elif t == "pond":
+		if t == "pond":
 			var x0 := fx(f)
 			var w2 := float(f["w"])
-			var edge := minf(60.0, w2 * 0.3)
-			var inside := smoothstep(x0, x0 + edge, x) * (1.0 - smoothstep(x0 + w2 - edge, x0 + w2, x))
-			y += float(f["d"]) * inside
+			var u := clampf((x - x0) / w2, 0.0, 1.0)
+			y += float(f["d"]) * pow(sin(PI * u), 1.4)  # a shallow bowl: the banks slope gently into the water
 	return y
 
 static func in_pit(x: float) -> bool:

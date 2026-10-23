@@ -63,12 +63,15 @@ func _run() -> void:
 	for i in 30:
 		await physics_frame
 	await _shot("a_lying", 0.0, 0.3)
-	await _shot("m_4400", 4400.0, 9.0)
-	await _shot("m_4900", 4900.0, 9.0)
-	await _shot("m_5300", 5300.0, 9.0)
-	await _shot("m_5700", 5700.0, 9.0)
+	await _shot("b_pit", 560.0, 9.0)
+	await _shot("c_log", 1130.0, 9.0)
+	await _shot("d_thorns", 1650.0, 9.0)
+	await _shot("e_pond", 2130.0, 9.0)
+	await _shot("f_boulder", 2770.0, 9.0)
+	await _shot("g_island", 3230.0, 9.0)
+	await _shot("h_open", 3600.0, 9.0, 300.0)
 	# wading through the first pond
-	var px: float = Scene1.START_X + 2560.0 - 60.0
+	var px: float = Scene1.START_X + 2250.0 - 60.0
 	level.player.position = Vector2(px - 13.0, Scene1.ground_top(px) - 56.0)
 	level.scene1.intro_time = 9.0
 	Input.action_press("move_right")
@@ -79,18 +82,4 @@ func _run() -> void:
 		if i == 110:
 			await _snap("w_mid")
 	Input.action_release("move_right")
-	await _shot("b_pit_spikes", 1000.0, 9.0)
-	await _shot("c_log", 1400.0, 9.0)
-	await _shot("d_thorns", 2150.0, 9.0)
-	await _shot("e_pond", 2560.0, 9.0)
-	await _shot("f_island_pit", 3030.0, 9.0)
-	await _shot("g_boulder", 3450.0, 9.0)
-	await _shot("h_pond_stones", 4700.0, 9.0)
-	await _shot("i_log_big", 5650.0, 9.0)
-	await _shot("j_edge_1", 4700.0, 9.0)
-	await _shot("j_edge_2", 5000.0, 9.0)
-	await _shot("j_edge_3", 5300.0, 9.0)
-	await _shot("j_edge_4", 5600.0, 9.0)
-	await _shot("j_edge_5", 5900.0, 9.0)
-	await _shot("k_open_end", 6800.0, 9.0, 300.0)
 	quit(0)

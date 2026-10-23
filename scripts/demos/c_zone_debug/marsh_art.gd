@@ -171,6 +171,8 @@ func _ink_stage(z: int, soften: float) -> Dictionary:
 	view.size = Vector2i(1280, 720)
 	view.transparent_bg = true
 	view.disable_3d = true
+	# the ink shapes are plain polygons: without this their edges are stair-stepped, and the steps crawl as the camera moves
+	view.msaa_2d = Viewport.MSAA_4X
 	view.render_target_update_mode = SubViewport.UPDATE_DISABLED
 	add_child(view)
 	var root := Node2D.new()
@@ -209,8 +211,11 @@ func sync(delta: float, new_camera_x: float, active: bool) -> void:
 	for stage in [back_stage, front_stage]:
 		var shake: Vector2 = level.camera.offset
 		var camera_y: float = level.camera_y
-		(stage.root as Node2D).position = Vector2(-camera_x - shake.x, -shake.y - camera_y)
-		(stage.sprite as Sprite2D).position = Vector2(camera_x + shake.x, shake.y + camera_y)
+		# The stage is moved in whole pixels: the picture is rasterised once per frame, and at a fractional offset every edge would be
+		# sampled differently from one frame to the next (the edges of the trunks crawled, which is what made running dizzy).
+		var snapped := Vector2(roundf(camera_x + shake.x), roundf(shake.y + camera_y))
+		(stage.root as Node2D).position = -snapped
+		(stage.sprite as Sprite2D).position = snapped
 	_sync_flames()
 	_update_effects(delta)
 	dyn.queue_redraw()

@@ -16,7 +16,7 @@ const Scene1Act = preload("res://scripts/demos/c_zone_debug/scene1_act.gd")
 const HoodManifest = preload("res://scripts/actors/hood_actor_manifest.gd")
 
 const WORLD_WIDTH := 15200.0
-const WORLD_MIN_X := -12000.0  # scenes 1 to 6 (the cliff, the descent and the bat cave) lie west of the C zone
+const WORLD_MIN_X := -8500.0  # scenes 1 to 6 (the cliff, the descent and the bat cave) lie west of the C zone
 const PLAYER_SIZE := Vector2(26, 54)
 const ACTOR_VISUAL_SCALE := 0.90
 const CRATE_SIZE := Vector2(144, 32)
