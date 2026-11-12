@@ -10,7 +10,7 @@ const WAVE_DX := 4.0
 const WAVE_SPEED := 150.0
 const WAVE_DAMP := 2.4
 const WAVE_LEAK := 1.6
-const WAVE_MAX := 9.0
+const WAVE_MAX := 8.0
 
 const SHADER_CODE := """shader_type canvas_item;
 uniform sampler2D scene_color : hint_screen_texture, repeat_disable, filter_linear;
@@ -35,22 +35,22 @@ void fragment() {
 	float bed = texture(bed_height, vec2((world_position.x - x0) / span, 0.5)).r;
 	float clearance = bed - world_position.y;
 	if (clearance <= 0.0) { discard; }
-	float edge_aa = smoothstep(0.0, 9.0, clearance);  // the water thins out into the bank, no hard edge
+	float edge_aa = smoothstep(0.0, max(fwidth(world_position.y), 0.5), clearance);
 	float distortion = sin(world_position.y * 0.18 + clock * 2.1) * 0.35 + sin(world_position.x * 0.09 - clock * 1.3) * 0.15;
 	distortion *= smoothstep(0.0, 3.0, clearance);
 	vec2 bend = vec2(distortion + swell_slope * 30.0 * exp(-depth / 12.0), swell_slope * 7.0 * exp(-depth / 8.0));
 	vec2 refract_uv = SCREEN_UV + bend * SCREEN_PIXEL_SIZE * smoothstep(0.0, 6.0, depth);
 	vec3 submerged = texture(scene_color, refract_uv).rgb;
-	float bed_depth = max(bed - water_y, 3.0);
-	float frac = clamp(depth / bed_depth, 0.0, 1.0);
-	float tone = mix(0.42, 0.10, frac);
-	vec3 water = mix(vec3(tone), submerged * 0.80, mix(0.88, 0.62, smoothstep(0.0, 14.0, depth)));
+	// Absorb by optical depth instead of mixing a pale opaque fog tint.
+	// Refracted legs and bank remain visible, while the basin separates from air.
+	float transmission=exp(-max(depth,0.0)*0.028);
+	vec3 water=submerged*mix(0.98,transmission,smoothstep(0.0,5.0,depth));
+	water=mix(water,vec3(0.025),0.035*(1.0-transmission));
 	float world_pixel = SCREEN_PIXEL_SIZE.y / max(fwidth(world_position.y), 0.001);
 	vec2 reflected_uv = vec2(refract_uv.x, SCREEN_UV.y - (depth * 2.0 + wave) * world_pixel);
 	vec3 reflected = texture(scene_color, clamp(reflected_uv, vec2(0.0), vec2(1.0))).rgb;
-	water = mix(water, reflected, 0.16 * exp(-depth / 10.0));
-	water *= mix(1.0, 0.5, frac);
-	float band = (1.0 - smoothstep(0.0, 2.4, depth)) * (0.14 + 0.05 * sin(world_position.x * 0.021 + clock * 0.6));
+	water = mix(water, reflected, 0.30 * exp(-depth / 6.0));
+	float band = (1.0 - smoothstep(0.0, 2.4, depth)) * (0.07 + 0.035 * sin(world_position.x * 0.021 + clock * 0.6));
 	band *= 1.0 + abs(swell_slope) * 7.0 + abs(swell) * 0.2;
 	water = mix(water, vec3(0.66), clamp(band, 0.0, 0.7));
 	water += vec3(0.24) * clamp(abs(swell_slope) * 2.4, 0.0, 0.45) * (1.0 - smoothstep(0.0, 8.0, depth));
@@ -69,6 +69,11 @@ var wave_kicks: Array[Dictionary] = []
 var wave_texture: ImageTexture
 var material_value: ShaderMaterial
 var polygon: Polygon2D
+var bed_function: Callable
+var bed_ys := PackedFloat32Array()  # the ground's height under each wave cell
+var wet_cells := PackedByteArray()  # per wave cell: is there water (the bed is under the surface)? (looked up, not computed, while drawing)
+var energy := 0.0  # how much the water still moves: a calm pond is neither simulated nor redrawn
+var was_active := true
 var splash_layer: Node2D
 var impacts: Array[Dictionary] = []
 var rng := RandomNumberGenerator.new()
@@ -78,6 +83,7 @@ var clock := 0.0
 
 func setup(new_level: Node2D, x0: float, x1: float, y: float, bed_fn: Callable, depth: float) -> void:
 	level = new_level
+	bed_function = bed_fn
 	x_start = x0
 	x_end = x1
 	surface_y = y
@@ -91,8 +97,13 @@ func setup(new_level: Node2D, x0: float, x1: float, y: float, bed_fn: Callable, 
 		var shore := minf(x - x0, x1 - x)
 		wave_damp[i] = WAVE_DAMP + 4.0 * (1.0 - smoothstep(0.0, 36.0, shore))
 	var beds := Image.create(cells, 1, false, Image.FORMAT_RF)
+	wet_cells.resize(cells)
+	bed_ys.resize(cells)
 	for i in cells:
-		beds.set_pixel(i, 0, Color(float(bed_fn.call(x0 + float(i) * WAVE_DX)), 0.0, 0.0, 1.0))
+		var bed_y := float(bed_fn.call(x0 + float(i) * WAVE_DX))
+		beds.set_pixel(i, 0, Color(bed_y, 0.0, 0.0, 1.0))
+		wet_cells[i] = 1 if bed_y > y + 1.5 else 0
+		bed_ys[i] = bed_y
 	wave_texture = ImageTexture.create_from_image(Image.create_from_data(cells, 1, false, Image.FORMAT_RF, wave_h.to_byte_array()))
 	var shader := Shader.new()
 	shader.code = SHADER_CODE
@@ -145,11 +156,14 @@ func _step_waves(delta: float) -> void:
 	var steps := clampi(int(ceil(delta * 120.0)), 1, 5)
 	var dt := minf(delta, 0.05) / float(steps)
 	var c2 := WAVE_SPEED * WAVE_SPEED / (WAVE_DX * WAVE_DX)
+	var peak := 0.0
 	for step in steps:
 		for i in range(1, cells - 1):
 			wave_v[i] += (c2 * (wave_h[i - 1] + wave_h[i + 1] - 2.0 * wave_h[i]) - wave_damp[i] * wave_v[i]) * dt
 		for i in range(1, cells - 1):
 			wave_h[i] = clampf((wave_h[i] + wave_v[i] * dt) * (1.0 - WAVE_LEAK * dt), -WAVE_MAX, WAVE_MAX)
+			peak = maxf(peak, absf(wave_h[i]) + absf(wave_v[i]) * 0.02)
+	energy = peak
 	wave_texture.update(Image.create_from_data(cells, 1, false, Image.FORMAT_RF, wave_h.to_byte_array()))
 
 # Called every frame with the boy's feet and velocity.
@@ -164,37 +178,60 @@ func update(delta: float, feet: Vector2, velocity: Vector2, previous_feet_y: flo
 		splash(feet.x, 90.0, 9.0)  # stepping out
 	inside = wet
 	if wet and absf(velocity.x) > 20.0:
+		# the water moves with him: every frame a trough at his legs and a low bow wave ahead of them, so a wake runs along with him
+		var dir := signf(velocity.x)
+		var speed := absf(velocity.x)
+		disturb(feet.x - dir * 6.0, -speed * 0.034, 13.0)
+		disturb(feet.x + dir * 22.0, speed * 0.018, 15.0)
 		wade_clock += delta
-		if wade_clock > 0.16:
+		if wade_clock > 0.09:
 			wade_clock = 0.0
-			disturb(feet.x - signf(velocity.x) * 14.0, -absf(velocity.x) * 0.09, 8.0)
-			impacts.append({"x": feet.x - signf(velocity.x) * 10.0, "age": 0.0, "strength": 0.3, "spread": 7.0, "ring_only": true})
+			impacts.append({"x": feet.x - dir * 8.0, "age": 0.0, "strength": 0.7, "spread": 12.0, "ring_only": true})
 			if impacts.size() > 6:
 				impacts.pop_front()
 	for i in range(impacts.size() - 1, -1, -1):
 		impacts[i].age += delta
 		if impacts[i].age > 2.0:
 			impacts.remove_at(i)
-	_step_waves(delta)
-	splash_layer.queue_redraw()
+	var active := not impacts.is_empty() or not wave_kicks.is_empty() or energy > 0.02
+	if active:
+		_step_waves(delta)
+		splash_layer.queue_redraw()
+	elif was_active:
+		# it has just come to rest: the last picture (flat water) is drawn once and kept
+		for i in cells:
+			wave_h[i] = 0.0
+			wave_v[i] = 0.0
+		wave_texture.update(Image.create_from_data(cells, 1, false, Image.FORMAT_RF, wave_h.to_byte_array()))
+		splash_layer.queue_redraw()
+	was_active = active
 
 func _wave_at(x: float) -> float:
 	var f := clampf((x - x_start) / WAVE_DX, 0.0, float(cells) - 1.001)
 	var i := int(f)
 	return lerpf(wave_h[i], wave_h[i + 1], f - float(i))
 
+# is there water at x (the ground under the surface is lower than the surface)?
+func _bed_at(x: float) -> float:
+	return bed_ys[clampi(int(roundf((x - x_start) / WAVE_DX)), 0, cells - 1)]
+
+func _wet(x: float) -> bool:
+	if x <= x_start + 1.0 or x >= x_end - 1.0:
+		return false
+	return wet_cells[clampi(int(roundf((x - x_start) / WAVE_DX)), 0, cells - 1)] == 1
+
 func _draw_splashes() -> void:
 	var line_color := Color(0.66, 0.66, 0.64)
-	# the surface itself: a bright line that rides the swell, and a dark one under it
+	# the surface itself: a bright line that rides the swell (a few segments, each with its own brightness; only over water)
 	var prev := Vector2.ZERO
 	var first := true
 	var x := x_start + 4.0
 	while x < x_end - 4.0:
-		var y := surface_y - _wave_at(x)
-		var p := Vector2(x, y)
-		if not first:
-			var activity := clampf(absf(_wave_at(x)) * 0.14 + absf(_wave_at(x) - _wave_at(x - 8.0)) * 0.2, 0.0, 1.0)
-			splash_layer.draw_line(prev, p, Color(line_color, 0.30 + activity * 0.5), 1.4, true)
+		var wave_here := _wave_at(x)
+		var p := Vector2(x, surface_y - wave_here)
+		if not first and _wet(x) and _wet(x - 8.0):
+			var activity := clampf(absf(wave_here) * 0.14 + absf(wave_here - _wave_at(x - 8.0)) * 0.2, 0.0, 1.0)
+			splash_layer.draw_line(prev, p, Color(line_color, 0.13 + activity * 0.48), 1.4)
 		prev = p
 		first = false
 		x += 8.0
@@ -208,24 +245,46 @@ func _draw_splashes() -> void:
 				for side in [-1.0, 1.0]:
 					var base := origin + Vector2(side * float(impact.spread) * 0.8, 0.0)
 					splash_layer.draw_colored_polygon(PackedVector2Array([base + Vector2(-5, 1), base + Vector2(side * 5.0, -height), base + Vector2(side * 10.0, -height * 0.6), base + Vector2(side * 14.0, 1)]), Color(0.65, 0.65, 0.63, (1.0 - t / 0.28) * 0.5))
-			for i in 16:
-				var side2 := -1.0 if i % 2 == 0 else 1.0
-				var vx := side2 * (14.0 + fposmod(float(i) * 17.7, 46.0)) * strength
-				var vy := -(46.0 + fposmod(float(i) * 29.3, 70.0)) * strength
-				var point := origin + Vector2(side2 * float(impact.spread) * 0.35 + vx * t, vy * t + 170.0 * t * t)
-				if point.y > surface_y + 1.0 or t > 0.8:
-					continue
-				var alpha := (1.0 - t / 0.8) * 0.7
-				var tail := Vector2(vx, vy + 340.0 * t).normalized() * (1.2 + strength * 1.8)
-				splash_layer.draw_line(point + Vector2(0, 0.6), point - tail + Vector2(0, 0.6), Color(0.16, 0.16, 0.16, alpha * 0.5), 2.0, true)
-				splash_layer.draw_line(point, point - tail, Color(0.82, 0.82, 0.8, alpha), 1.2, true)
-		# rings that run out and fade
+			if t < 0.8:
+				for i in 8:
+					var side2 := -1.0 if i % 2 == 0 else 1.0
+					var vx := side2 * (14.0 + fposmod(float(i) * 17.7, 46.0)) * strength
+					var vy := -(46.0 + fposmod(float(i) * 29.3, 70.0)) * strength
+					var point := origin + Vector2(side2 * float(impact.spread) * 0.35 + vx * t, vy * t + 170.0 * t * t)
+					if point.y > surface_y + 1.0:
+						continue
+					var alpha := (1.0 - t / 0.8) * 0.7
+					var tail := Vector2(vx, vy + 340.0 * t).normalized() * (1.2 + strength * 1.8)
+					splash_layer.draw_line(point, point - tail, Color(0.82, 0.82, 0.8, alpha), 1.4)
+		# rings that run out and fade: a flat ellipse on the surface, only the parts over water are drawn (a polyline per run)
 		var life := 1.0 + strength * 0.9
 		for k in 3:
 			var age := t - float(k) * 0.15
 			if age < 0.0 or age > life:
 				continue
 			var fade := 1.0 - age / life
-			splash_layer.draw_set_transform(origin + Vector2(0, 1.5), 0.0, Vector2(1.0, 0.16))
-			splash_layer.draw_arc(Vector2.ZERO, float(impact.spread) * 0.5 + age * (46.0 + strength * 26.0), 0.0, TAU, 40, Color(0.72, 0.72, 0.70, fade * fade * (0.40 - float(k) * 0.08)), 1.4, true)
-			splash_layer.draw_set_transform(Vector2.ZERO)
+			var radius: float = float(impact.spread) * 0.5 + age * (46.0 + strength * 26.0)
+			var ring_alpha: float = fade * (0.62 - float(k) * 0.12)
+			# only the part of the ring that lies in the water: the lower half of the ellipse (under the surface), above the bed: nothing is
+			# ever drawn in the air or over the ground
+			var run := PackedVector2Array()
+			for step in range(25):
+				var angle := float(step) / 24.0 * PI
+				var rp := origin + Vector2(cos(angle) * radius, 1.5 + sin(angle) * minf(radius * 0.30, 14.0))
+				if _wet(rp.x) and rp.y < _bed_at(rp.x) - 1.5:
+					run.append(rp)
+				elif run.size() > 1:
+					_ring_run(run, ring_alpha)
+					run = PackedVector2Array()
+				else:
+					run = PackedVector2Array()
+			if run.size() > 1:
+				_ring_run(run, ring_alpha)
+
+func _ring_run(run: PackedVector2Array, alpha: float) -> void:
+	# fades towards the banks: the colour of each point
+	var colors := PackedColorArray()
+	for point in run:
+		var edge_fade := clampf(minf(point.x - x_start, x_end - point.x) / 30.0, 0.0, 1.0)
+		colors.append(Color(0.72, 0.72, 0.70, alpha * edge_fade))
+	splash_layer.draw_polyline_colors(run, colors, 1.4)

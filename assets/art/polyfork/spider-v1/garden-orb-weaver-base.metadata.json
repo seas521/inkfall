@@ -1,0 +1,375 @@
+{
+    "id": "garden-orb-weaver-base",
+    "title": "Garden orb weaver",
+    "class": "animal",
+    "triangles": 2942,
+    "kit": null,
+    "free": true,
+    "plan": "free",
+    "price_usd": 0,
+    "price_note": "free: every low poly model is. The /cdn links need no account and no key (an account adds the ready-to-serve zip). The HD edition, where `hd` is not null, comes with Pro",
+    "owned": true,
+    "page": "https://polyfork.dev/asset/garden-orb-weaver-base",
+    "thumbnail": "https://polyfork.dev/files/garden-orb-weaver-base/renders/hero.png",
+    "preview_glb": "https://polyfork.dev/cdn/garden-orb-weaver-base-preview.glb",
+    "hd": {
+        "plan": "pro",
+        "page": "https://polyfork.dev/asset/garden-orb-weaver-base?edition=hd",
+        "kind": "pbr materials on this same mesh"
+    },
+    "preview_triangles": 2942,
+    "preview_fidelity": 1,
+    "preview_rigged": true,
+    "preview_rig": "skinned",
+    "preview_note": "The SKELETON comes with it: this preview carries its skin and its bones, so a clip plays on it as delivered; its normals are stripped for flat shading. This model is free, so build with `download.glb`: the authored file, normals and node names as built.",
+    "has_rig": true,
+    "remixable": true,
+    "has_night": false,
+    "has_decals": false,
+    "has_ik": false,
+    "ik_type": null,
+    "has_skeleton": false,
+    "size_m": {
+        "x": 4.7,
+        "y": 1.47,
+        "z": 5.42
+    },
+    "origin_y": 0,
+    "mass_kg": 4770,
+    "download": {
+        "glb": "https://polyfork.dev/cdn/garden-orb-weaver-base.glb",
+        "mjs": "https://polyfork.dev/cdn/garden-orb-weaver-base.mjs",
+        "auth": "none"
+    },
+    "export_formats": {
+        "fbx": {
+            "url": "https://polyfork.dev/dl/garden-orb-weaver-base.fbx",
+            "for": "Unity, Unreal, Maya, 3ds Max",
+            "available": true
+        },
+        "usdz": {
+            "url": "https://polyfork.dev/dl/garden-orb-weaver-base.usdz",
+            "for": "iOS AR Quick Look, Omniverse; with UsdPhysics collision and mass",
+            "available": true
+        },
+        "usda": {
+            "url": "https://polyfork.dev/dl/garden-orb-weaver-base.usda",
+            "for": "Isaac Sim, Omniverse, Blender, usdview; with UsdPhysics collision and mass",
+            "available": true
+        },
+        "obj": {
+            "url": "https://polyfork.dev/dl/garden-orb-weaver-base.obj",
+            "for": "universal, geometry only, no pivots",
+            "available": true,
+            "also_fetch": "https://polyfork.dev/dl/garden-orb-weaver-base.mtl",
+            "also_fetch_note": "save it beside the .obj as garden-orb-weaver-base.mtl: the model names that exact file and imports white without it"
+        }
+    },
+    "export_note": "vertex colours become NAMED MATERIALS on export, named after this asset's own colour knobs; a plain format conversion would arrive white, because only three.js reads our COLOR_0. Built on first request (about a second), cached after. This model is free: these download with no account and no key (only its .mjs source asks for a free account).",
+    "params_url": "https://polyfork.dev/cdn/garden-orb-weaver-base-params.json",
+    "real_scale": {
+        "at_real_size": false,
+        "real_m": [
+            0.01,
+            0.03
+        ],
+        "real_dimension": "length",
+        "as_built_m": 5.42,
+        "scale_to_real": 0,
+        "note": "built LARGER than the real thing: its largest dimension is 5.42 m as built, a real one is typically 0.01-0.03 m (an estimate). Scaling the object by about 0 gives real size. size_m, physics and mass_kg describe the model as built; mass goes with the cube of the scale."
+    },
+    "physics": {
+        "mass_kg": 4770,
+        "mass_source": "estimated",
+        "material": "flesh",
+        "body": "dynamic",
+        "dimensions_m": {
+            "x": 4.701,
+            "y": 1.47,
+            "z": 5.425
+        },
+        "up_axis": "Y",
+        "meters_per_unit": 1,
+        "volume_m3": 4.772495,
+        "collision": {
+            "approximation": "convexDecomposition",
+            "parts": 10,
+            "colliders_url": "https://polyfork.dev/cdn/garden-orb-weaver-base-colliders.json"
+        },
+        "note": "For the default knob settings; a size knob changes all of it. dimensions_m and the colliders are measured from the model; mass_kg and material are an estimate of what the real object weighs. body \"static\" means fixed in place (give it a collider, no rigid body); \"dynamic\" means it moves. collision.approximation uses UsdPhysics terms: \"convexHull\" = one hull is a good fit, \"convexDecomposition\" = use the per-part hulls in colliders_url (the one hull would fill a gap, like the space under a table). Model space, metres, Y up, origin as the model ships."
+    },
+    "simready_metadata": {
+        "simready_metadata_mass": 4770,
+        "simready_metadata_rigid_body_count": 1,
+        "usd_dimensions": [
+            4.701,
+            5.425,
+            1.47
+        ],
+        "usd_up_axis": "Z",
+        "usd_meters_per_unit": 1,
+        "simready_metadata_validation__profile": null
+    },
+    "materials": 1,
+    "draw_calls": 1,
+    "description": "Low-poly garden-orb-weaver with editable proportions and authored animations. Animals v2. Built at 4.7 x 1.47 x 5.42 m, 2,942 triangles on one material.",
+    "palette": [
+        {
+            "hex": "#573c27",
+            "share": 0.223
+        },
+        {
+            "hex": "#9d846d",
+            "share": 0.192
+        },
+        {
+            "hex": "#ad947c",
+            "share": 0.184
+        },
+        {
+            "hex": "#c6b6a3",
+            "share": 0.114
+        },
+        {
+            "hex": "#735840",
+            "share": 0.098
+        },
+        {
+            "hex": "#8c6644",
+            "share": 0.09
+        }
+    ],
+    "style": "low-poly, flat-shaded vertex colors, no textures, single shared material, so any set of these merges to one draw call",
+    "origin": "ground level (minY = 0): the model sits on y=0 as-is",
+    "rigged_parts": {
+        "Abdomen": {
+            "axis": "x",
+            "range": [
+                0,
+                -12
+            ]
+        },
+        "LeftPedipalp": {
+            "axis": "x",
+            "range": [
+                0,
+                -24
+            ]
+        },
+        "RightPedipalp": {
+            "axis": "x",
+            "range": [
+                0,
+                -24
+            ]
+        },
+        "LeftFang": {
+            "axis": "x",
+            "range": [
+                -18,
+                15
+            ]
+        },
+        "RightFang": {
+            "axis": "x",
+            "range": [
+                -18,
+                15
+            ]
+        },
+        "LeftLeg1Hip": {
+            "axis": "y",
+            "range": [
+                0,
+                -22
+            ]
+        },
+        "LeftLeg1Knee": {
+            "axis": "z",
+            "range": [
+                0,
+                30
+            ]
+        },
+        "LeftLeg2Hip": {
+            "axis": "y",
+            "range": [
+                0,
+                -22
+            ]
+        },
+        "LeftLeg2Knee": {
+            "axis": "z",
+            "range": [
+                0,
+                30
+            ]
+        },
+        "LeftLeg3Hip": {
+            "axis": "y",
+            "range": [
+                0,
+                22
+            ]
+        },
+        "LeftLeg3Knee": {
+            "axis": "z",
+            "range": [
+                0,
+                30
+            ]
+        },
+        "LeftLeg4Hip": {
+            "axis": "y",
+            "range": [
+                0,
+                22
+            ]
+        },
+        "LeftLeg4Knee": {
+            "axis": "z",
+            "range": [
+                0,
+                30
+            ]
+        },
+        "RightLeg1Hip": {
+            "axis": "y",
+            "range": [
+                0,
+                22
+            ]
+        },
+        "RightLeg1Knee": {
+            "axis": "z",
+            "range": [
+                0,
+                -30
+            ]
+        },
+        "RightLeg2Hip": {
+            "axis": "y",
+            "range": [
+                0,
+                22
+            ]
+        },
+        "RightLeg2Knee": {
+            "axis": "z",
+            "range": [
+                0,
+                -30
+            ]
+        },
+        "RightLeg3Hip": {
+            "axis": "y",
+            "range": [
+                0,
+                -22
+            ]
+        },
+        "RightLeg3Knee": {
+            "axis": "z",
+            "range": [
+                0,
+                -30
+            ]
+        },
+        "RightLeg4Hip": {
+            "axis": "y",
+            "range": [
+                0,
+                -22
+            ]
+        },
+        "RightLeg4Knee": {
+            "axis": "z",
+            "range": [
+                0,
+                -30
+            ]
+        }
+    },
+    "detachable_parts": [],
+    "animation": "rigged parts are named groups with the pivot at the hinge/axle: obj.getObjectByName(part) then rotation[axis] (rotate, degrees) or position[axis] (slide, meters). 0 is the pose the model is built in, which is not always shut: `range` is all the travel the part has from there, and outside it the part passes through the body. Whether the range opens or closes is in that knob's describe in params_url",
+    "clips": [
+        {
+            "name": "Walk",
+            "seconds": 1.2
+        },
+        {
+            "name": "Idle",
+            "seconds": 6
+        },
+        {
+            "name": "Run",
+            "seconds": 0.64
+        }
+    ],
+    "clips_note": "inside the .glb and its preview: gltf.animations by these names, played with THREE.AnimationMixer. Not in the .mjs, which builds the model without them.",
+    "published_at": "2026-10-11 23:23:44",
+    "renders": [
+        "https://polyfork.dev/files/garden-orb-weaver-base/renders/back.png",
+        "https://polyfork.dev/files/garden-orb-weaver-base/renders/close.png",
+        "https://polyfork.dev/files/garden-orb-weaver-base/renders/detail.png",
+        "https://polyfork.dev/files/garden-orb-weaver-base/renders/front.png",
+        "https://polyfork.dev/files/garden-orb-weaver-base/renders/hero-crop.png",
+        "https://polyfork.dev/files/garden-orb-weaver-base/renders/hero.png",
+        "https://polyfork.dev/files/garden-orb-weaver-base/renders/left.png",
+        "https://polyfork.dev/files/garden-orb-weaver-base/renders/low-back.png",
+        "https://polyfork.dev/files/garden-orb-weaver-base/renders/low.png",
+        "https://polyfork.dev/files/garden-orb-weaver-base/renders/pose-Abdomen.png",
+        "https://polyfork.dev/files/garden-orb-weaver-base/renders/pose-LeftFang.png",
+        "https://polyfork.dev/files/garden-orb-weaver-base/renders/pose-LeftLeg1Hip.png",
+        "https://polyfork.dev/files/garden-orb-weaver-base/renders/pose-LeftLeg1Knee.png",
+        "https://polyfork.dev/files/garden-orb-weaver-base/renders/pose-LeftLeg2Hip.png",
+        "https://polyfork.dev/files/garden-orb-weaver-base/renders/pose-LeftLeg2Knee.png",
+        "https://polyfork.dev/files/garden-orb-weaver-base/renders/pose-LeftLeg3Hip.png",
+        "https://polyfork.dev/files/garden-orb-weaver-base/renders/pose-LeftLeg3Knee.png",
+        "https://polyfork.dev/files/garden-orb-weaver-base/renders/pose-LeftLeg4Hip.png",
+        "https://polyfork.dev/files/garden-orb-weaver-base/renders/pose-LeftLeg4Knee.png",
+        "https://polyfork.dev/files/garden-orb-weaver-base/renders/pose-LeftPedipalp.png",
+        "https://polyfork.dev/files/garden-orb-weaver-base/renders/pose-RightFang.png",
+        "https://polyfork.dev/files/garden-orb-weaver-base/renders/pose-RightLeg1Hip.png",
+        "https://polyfork.dev/files/garden-orb-weaver-base/renders/pose-RightLeg1Knee.png",
+        "https://polyfork.dev/files/garden-orb-weaver-base/renders/pose-RightLeg2Hip.png",
+        "https://polyfork.dev/files/garden-orb-weaver-base/renders/pose-RightLeg2Knee.png",
+        "https://polyfork.dev/files/garden-orb-weaver-base/renders/pose-RightLeg3Hip.png",
+        "https://polyfork.dev/files/garden-orb-weaver-base/renders/pose-RightLeg3Knee.png",
+        "https://polyfork.dev/files/garden-orb-weaver-base/renders/pose-RightLeg4Hip.png",
+        "https://polyfork.dev/files/garden-orb-weaver-base/renders/pose-RightLeg4Knee.png",
+        "https://polyfork.dev/files/garden-orb-weaver-base/renders/pose-RightPedipalp.png",
+        "https://polyfork.dev/files/garden-orb-weaver-base/renders/proofs.png",
+        "https://polyfork.dev/files/garden-orb-weaver-base/renders/right.png",
+        "https://polyfork.dev/files/garden-orb-weaver-base/renders/top.png",
+        "https://polyfork.dev/files/garden-orb-weaver-base/renders/tpose.png",
+        "https://polyfork.dev/files/garden-orb-weaver-base/renders/under.png",
+        "https://polyfork.dev/files/garden-orb-weaver-base/renders/views.png"
+    ],
+    "license": "Mesh files (GLB, FBX, USD, OBJ): CC BY 4.0 with the line in `credit`, or the Polyfork licence with no credit and no redistribution, your choice. The .mjs source and the HD edition: Polyfork licence only, commercial use, no attribution, no redistribution. https://polyfork.dev/licensing",
+    "credit": "Garden orb weaver by Polyfork (https://polyfork.dev/asset/garden-orb-weaver-base), CC BY 4.0",
+    "access": {
+        "as": "anonymous",
+        "remix_bakes_per_hour": 40,
+        "remix_bakes_left_this_hour": 40,
+        "remix_note": "The budget is on generating NEW geometry. Variations anyone has already baked are served to everybody and never counted, so re-fetching a variant you or anyone else has made costs nothing.",
+        "remix_bakes_per_month": 100,
+        "remix_bakes_left_this_month": 100,
+        "remix_allowance_resets": "2026-12-01",
+        "remix_allowance_note": "Anonymous callers are counted per IP address, so other sessions from the same address share this. A free account raises it to 300 a WEEK on its own budget, and costs an email address.",
+        "a_free_account_adds": {
+            "how": "Authorization: Bearer <key>, created at https://polyfork.dev/account. Costs an email address.",
+            "remix_bakes_per_hour": 100,
+            "remix_bakes_per_week": 300,
+            "downloads": "every low poly model's .mjs program and a ready-to-serve zip from /dl, and any kit as one zip (/dl/kit-<id>.zip). The .glb, .fbx, .usdz, .usda and .obj need no key"
+        },
+        "pro_adds": {
+            "url": "https://polyfork.dev/pricing",
+            "usd_per_year": 149,
+            "hd_editions": "the HD edition of a model: the same program built finer, high poly with PBR materials generated in code, every knob still working. 1,769 models have one. Free accounts get its public preview (/cdn/<id>-hd-preview.glb) only",
+            "cdn": "a per-account /c/<token>/ path for the HD files you can hotlink from a shipped build; it keeps up when an asset is rebuilt, and the token is not the API key",
+            "remix_bakes_per_hour": 900,
+            "remix_bakes_per_week": "uncapped: a free account gets a weekly allowance, Pro does not"
+        }
+    }
+}

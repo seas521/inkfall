@@ -3,7 +3,7 @@ extends Node2D
 # Test scene for the Seedance frame clips of the hooded boy. Not connected to level 1.
 #   A / D or arrows   run left / right at one constant speed; let go to stop; pressing the other way
 #                     turns him and he runs that way at once (same as level 1)
-#   W / Up / Space    jump (real physics, same numbers as level 1; hold = higher, let go early = lower)
+#   Space             jump (real physics, same numbers as level 1; hold = higher, let go early = lower)
 #   F   trip and fall from the air: tumble -> hits the ground -> lies still -> any key gets him up
 #   G   flinch (a scare / a hit): jerks back, then relaxes; moving again cuts it short
 #   E   grab the box (walks up to it first), E again lets go. Holding the key toward the box pushes it,
@@ -236,7 +236,7 @@ func _unhandled_key_input(event: InputEvent) -> void:
 		return
 	match key.keycode:
 		KEY_R: reset()
-		KEY_W, KEY_UP, KEY_SPACE:
+		KEY_SPACE:
 			jump_buffer = 0.13  # level 1: the press is remembered for 0.13s
 		KEY_P:
 			_on_p_pressed()
@@ -285,7 +285,7 @@ func _process(delta: float) -> void:
 				_begin_engage()
 			else:
 				_begin_pickup()
-	jump_held = forced_jump_held or Input.is_key_pressed(KEY_W) or Input.is_key_pressed(KEY_UP) or Input.is_key_pressed(KEY_SPACE)
+	jump_held = forced_jump_held or Input.is_key_pressed(KEY_SPACE)
 	tick(delta, dir)
 
 func _clip_for(s: String) -> String:
@@ -989,7 +989,7 @@ func tick(raw_delta: float, dir: float) -> void:
 	# The clips face left; facing right is the mirror image.
 	sprite.scale = Vector2(clip_scale * (-1.0 if facing > 0.0 else 1.0), clip_scale)
 	_update_item(delta)
-	info.text = "A/D 跑（匀速）  松手停  W/空格 跳(按住更高)  B 惊恐急刹(跑动中)  F 跌落  G 受惊  E 抓箱/松手  P 拾取/放下/按住投掷  C 对比旧角色  +/- 大小(%.2f)\n状态 %s   速度 %d   高度 %d" % [clip_scale, state, int(absf(vx)), int(-air_y)]
+	info.text = "A/D 跑（匀速）  松手停  空格 跳(按住更高)  B 惊恐急刹(跑动中)  F 跌落  G 受惊  E 抓箱/松手  P 拾取/放下/按住投掷  C 对比旧角色  +/- 大小(%.2f)\n状态 %s   速度 %d   高度 %d" % [clip_scale, state, int(absf(vx)), int(-air_y)]
 
 func _update_air(delta: float) -> void:
 	if state == "fall":

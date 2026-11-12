@@ -14,11 +14,14 @@ const CliffArt = preload("res://scripts/demos/c_zone_debug/cliff_art.gd")
 const ForestAct = preload("res://scripts/demos/c_zone_debug/forest_act.gd")
 const Scene1Act = preload("res://scripts/demos/c_zone_debug/scene1_act.gd")
 const HoodManifest = preload("res://scripts/actors/hood_actor_manifest.gd")
+const DescentPreview = preload("res://scripts/demos/c_zone_debug/descent_preview.gd")
+const LogBridgeAct = preload("res://scripts/demos/c_zone_debug/log_bridge_act.gd")
+const RopeLadderAct = preload("res://scripts/demos/c_zone_debug/rope_ladder_act.gd")
 
 const WORLD_WIDTH := 15200.0
-const WORLD_MIN_X := -8500.0  # scenes 1 to 6 (the cliff, the descent and the bat cave) lie west of the C zone
+const WORLD_MIN_X := Scene1Act.START_X - 13.0 - 525.0  # Left edge of the wake-up shot; no empty camera travel west.
 const PLAYER_SIZE := Vector2(26, 54)
-const ACTOR_VISUAL_SCALE := 0.90
+const ACTOR_VISUAL_SCALE := Pose.HOOD_VISUAL_SCALE
 const CRATE_SIZE := Vector2(144, 32)
 const CRATE_START := Vector2(422, 518)
 const FAN_SPOT := Vector2(495, 292)
@@ -199,6 +202,9 @@ var marsh_art: Node2D
 var cliff: Node2D
 var forest: Node2D
 var scene1: Node2D
+var descent: Node2D
+var log_bridge: Node2D
+var rope_ladder: Node2D
 var stone_nodes: Array[Node2D] = []
 var stone_scales: Array[float] = []
 var fade_rect: ColorRect
@@ -339,6 +345,15 @@ func _ready() -> void:
 	hood_actor.z_index = 5
 	add_child(hood_actor)
 	actor = hood_actor
+	descent = DescentPreview.new()
+	descent.level = self
+	add_child(descent)
+	log_bridge = LogBridgeAct.new()
+	log_bridge.level = self
+	add_child(log_bridge)
+	rope_ladder = RopeLadderAct.new()
+	rope_ladder.level = self
+	add_child(rope_ladder)
 	rope_art = Node2D.new()
 	rope_art.z_index = 4
 	rope_art.draw.connect(_draw_ropes)
@@ -470,6 +485,10 @@ func _create_rack_platform() -> void:
 	add_child(rack)
 
 func reset_all() -> void:
+	if scene1!=null and scene1.spider!=null:scene1.spider.reset(true)
+	if scene1!=null and scene1.predator!=null:scene1.predator.reset(true)
+	if log_bridge != null:
+		log_bridge.stop()
 	checkpoint = 0
 	checkpoint_fan = false
 	fan_left_behind = false
@@ -508,6 +527,11 @@ func debug_enter_marsh_act() -> void:
 	_present(0.0)
 
 func restore_checkpoint() -> void:
+	if log_bridge != null and log_bridge.active:
+		log_bridge.failure_time = 0.0
+		log_bridge.restored = false
+		log_bridge.respawn()
+		return
 	camera_y = 0.0
 	if camera != null:
 		camera.position.y = 360.0
@@ -515,7 +539,7 @@ func restore_checkpoint() -> void:
 	crate.position = CRATE_START
 	if checkpoint == 6:
 		# Scene 1: he lies in the grass at the edge of the forest.
-		player.position = Scene1Act.spawn_position()
+		player.position = scene1.respawn_position()
 		crate.position = Vector2(RAFT_FLUSH_X, CRATE_START.y)
 	elif checkpoint >= 5:
 		# Act four: the hillside above the lift.
@@ -559,6 +583,12 @@ func restore_checkpoint() -> void:
 	cliff.reset(checkpoint >= 4)
 	forest.reset()
 	scene1.reset()
+	if checkpoint == 6 and (scene1.cp > 0 or scene1.predator.retry_armed or scene1.spider.retry_armed):
+		# back on his feet part of the way along: the picture is where he is, at once
+		player.velocity = Vector2.ZERO
+		facing = 1.0
+		camera_x = clampf(player.position.x - 525.0, WORLD_MIN_X, WORLD_WIDTH - 1280.0)
+		camera.position.x = camera_x + 640.0
 	rock_first_delay = 0.6
 	fan_owned = checkpoint_fan
 	fan_revealed = true
@@ -655,6 +685,15 @@ func _return_to_debug() -> void:
 func _physics_process(delta: float) -> void:
 	if paused:
 		return
+	if rope_ladder != null and rope_ladder.tick(delta):
+		return
+	# Free crouch remains available in every subsequent chapter mode. The
+	# ladder checks first, so S at a rung can never be consumed by crouching.
+	scene1.tick_low_stance(delta)
+	if log_bridge != null and log_bridge.tick(delta):
+		return
+	if descent != null and descent.tick(delta):
+		return
 	_update_curtain(delta)
 	clock += delta
 	_update_swing()
@@ -662,11 +701,15 @@ func _physics_process(delta: float) -> void:
 	cliff.tick(delta)
 	forest.tick(delta)
 	scene1.tick(delta)
-	if scene1.fell_off():
-		restore_checkpoint()
+	if scene1.predator!=null and scene1.predator.captured():
+		_update_camera(delta)
+		_present(delta)
 		return
+	camera_shake = maxf(camera_shake, scene1.shake())
+	if scene1.fell_off():
+		_fail_restore()  # (the curtain closes, then the checkpoint)
 	if marsh_hit_time <= 0.0 and death_time <= 0.0 and scene1.hazard_hit():
-		_start_marsh_hit("fall", player.position + PLAYER_SIZE * 0.5)  # thorns / the spikes at the bottom of a pit
+		_start_marsh_hit("fall", player.position + PLAYER_SIZE * 0.5)  # spikes at the bottom of a pit; surface brambles only trip
 	_update_marsh_rocks(delta)
 	grip_time = maxf(0.0, grip_time - delta)
 	release_time = maxf(0.0, release_time - delta)
@@ -714,6 +757,8 @@ func _physics_process(delta: float) -> void:
 			_finish_put_down()
 	var direction := 0.0 if cinematic_entry or rock_lock_time > 0.0 else Input.get_axis("move_left", "move_right")
 	direction = _update_fan_walk(delta, direction)
+	if scene1.auto_walking():
+		direction = 1.0  # scene 1, at the cliff: out of breath, he walks on by himself
 	if direction * launch_direction <= 0.0 or Input.is_action_just_pressed("jump"):
 		entry_brake = false
 	if intro_time > 0.0:
@@ -745,7 +790,7 @@ func _physics_process(delta: float) -> void:
 	if player.is_on_floor() or is_riding():
 		climb_floor_y = player.position.y + PLAYER_SIZE.y
 		climb_floor_on_raft = is_riding()
-	_try_begin_climb(direction)
+	if not scene1.low_stance.active():_try_begin_climb(direction)
 	if climb_time < 0.0 and forest.try_grab(player):
 		dragging = false
 		puzzle_box_dragging = false
@@ -1041,6 +1086,10 @@ func _finish_put_down() -> void:
 		_request_grab()
 
 func _update_interaction(direction: float) -> void:
+	if scene1.predator!=null and scene1.predator.interact():
+		if scene1.predator.bait==scene1.predator.Bait.HELD and direction!=0:
+			facing=signf(direction)
+		return
 	if intro_time > 0.0:
 		return
 	if pickup_time > 0.0 or put_down_time > 0.0:
@@ -1675,6 +1724,9 @@ func _start_marsh_hit(kind: String, source: Vector2) -> void:
 
 func _update_marsh_hit(delta: float) -> void:
 	marsh_hit_time += delta
+	if scene1.spider.state==scene1.spider.State.CAUGHT and not scene1.spider.victim_grounded:
+		scene1.spider.settle_victim(delta)
+		return
 	var feet_y := player.position.y + PLAYER_SIZE.y
 	if marsh_hit_kind == "fall" or marsh_hit_kind == "crush":
 		# Too far to fall, or flattened under the cage: he lies where it happened, then the fade and the checkpoint
@@ -1699,6 +1751,7 @@ func _update_marsh_hit(delta: float) -> void:
 		_fail_restore()
 
 func marsh_actor_alpha() -> float:
+	if scene1.spider!=null and scene1.spider.state==scene1.spider.State.CAUGHT:return 1.0
 	if marsh_hit_time <= 0.0:
 		return 1.0
 	if marsh_hit_kind == "rock":
@@ -1838,15 +1891,18 @@ func _update_player(delta: float, direction: float, crate_speed: float) -> void:
 	var grounded := player.is_on_floor() or is_riding()
 	coyote = 0.11 if grounded else maxf(0.0, coyote - delta)
 	jump_buffer = maxf(0.0, jump_buffer - delta)
-	if not cinematic_entry and Input.is_action_just_pressed("jump") and intro_time <= 0.0 and pickup_time <= 0.0 and put_down_time <= 0.0:
+	if not cinematic_entry and Input.is_action_just_pressed("jump") and intro_time <= 0.0 and pickup_time <= 0.0 and put_down_time <= 0.0 and not scene1.locks_jump():
 		jump_buffer = 0.13
 	var speed := 285.0 * (Pose.HOOD_RUN_SPEED_SCALE if grounded else Pose.HOOD_AIR_SPEED_SCALE)
 	var jump_scale := Pose.HOOD_JUMP_SCALE
+	if scene1.auto_walking():
+		speed = scene1.auto_speed(player.position.x + PLAYER_SIZE.x * 0.5)
 	var in_shallows := player.position.y + 54.0 > WATER_Y + 10.0
 	if in_shallows:
 		speed = 160.0
 	elif scene1.in_pond():
 		speed *= 0.62  # wading through a shallow pond in scene 1
+	if scene1.low_stance!=null and scene1.low_stance.active():speed=minf(speed,scene1.Crevice.low_speed(player.position.x+13) if player.position.y< -3900 else scene1.LowStance.SPEED)
 	var target := direction * speed
 	_update_rope_mode(delta, direction)
 	if entry_brake:
@@ -1867,7 +1923,7 @@ func _update_player(delta: float, direction: float, crate_speed: float) -> void:
 			accel = Pose.HOOD_START_ACCEL  # the first step shows before he is at speed (no sliding on the spot)
 		player.velocity.x = move_toward(player.velocity.x, target, delta * accel)
 	player.velocity.y = minf(850.0, player.velocity.y + 1500.0 * delta)
-	if rock_lock_time > 0.0 or (cliff.locks_move() or scene1.locks_move()):
+	if rock_lock_time > 0.0 or (cliff.locks_move() or scene1.locks_move()) or scene1.locks_jump():
 		jump_buffer = 0.0
 	var hood_gathers := grounded
 	if jump_buffer > 0.0 and coyote > 0.0 and jump_windup_left <= 0.0:
@@ -2043,7 +2099,7 @@ func _find_ledge(side: float, pressing: bool) -> bool:
 	if not below.is_empty():
 		return false
 	# room to stand on top of it
-	var end_x := found.x + side * (CLIMB_INSET - float(HoodManifest.CLIPS["climb"]["end_feet"][0]) * _climb_scale())
+	var end_x := found.x + side * ((2.0 if collider == scene1.body else CLIMB_INSET) - float(HoodManifest.CLIPS["climb"]["end_feet"][0]) * _climb_scale())
 	var shape := RectangleShape2D.new()
 	shape.size = Vector2(PLAYER_SIZE.x - 2.0, PLAYER_SIZE.y - 6.0)
 	var query := PhysicsShapeQueryParameters2D.new()
@@ -2053,7 +2109,8 @@ func _find_ledge(side: float, pressing: bool) -> bool:
 	query.transform = Transform2D(0.0, Vector2(end_x, found.y - PLAYER_SIZE.y * 0.5 - 4.0))
 	if not player.get_world_2d().direct_space_state.intersect_shape(query, 1).is_empty():
 		return false
-	climb_corner = found + Vector2(side * CLIMB_INSET, 0.0)
+	# (scene 1's boulders: the boy hangs at the face itself; the usual inset would leave most of him inside the rock)
+	climb_corner = found + Vector2(side * (2.0 if collider == scene1.body else CLIMB_INSET), 0.0)
 	return true
 
 # The drying rack above the raft is a one-way beam: he cannot hook an edge of it from the raft (it lies over him), so he takes
@@ -2075,6 +2132,12 @@ func _find_rack_climb(side: float) -> bool:
 
 func _try_begin_climb(direction: float) -> bool:
 	if _climb_blocked(direction):
+		return false
+	# The forest fallen timber is a low shelter. The generic ledge finder can
+	# otherwise lock onto its jagged left end and root the climb animation above
+	# the visual tree, leaving the actor apparently floating.
+	var climb_feet:=player.position+Vector2(13.0,54.0)
+	if climb_feet.y< -3900.0 and scene1.Crevice.blocks_climb(climb_feet.x):
 		return false
 	if player.velocity.y < -240.0 or player.velocity.y > 460.0:
 		return false  # hands find a ledge near the top of a jump, or falling past it; not on the way up at full speed
@@ -2161,6 +2224,12 @@ func _launch_jump(jump_scale: float) -> void:
 	puzzle_box_dragging = false
 
 func _present(delta: float) -> void:
+	if rope_ladder != null and rope_ladder.active():
+		rope_ladder._present(delta)
+		return
+	if log_bridge != null and log_bridge.active:
+		log_bridge._present(delta)
+		return
 	# Collision can alternate vx between zero and walking speed. A cancelled
 	# release must not resume when the player touches the sliding crate again.
 	if release_time > 0.0 and (not player.is_on_floor() or absf(player.velocity.x) >= 30.0 or pickup_time > 0.0 or fan_swing > 0.0):
@@ -2175,6 +2244,12 @@ func _present(delta: float) -> void:
 		if marsh_hit_kind == "fall":
 			action = Pose.ACTION_FALL_IMPACT if marsh_hit_time < 0.542 else Pose.ACTION_DOWNED
 			progress = clampf(marsh_hit_time / 0.542, 0.0, 1.0) if marsh_hit_time < 0.542 else clampf((marsh_hit_time - 0.542) / 1.0, 0.0, 1.0)
+			if scene1.spider.state==scene1.spider.State.CAUGHT and not scene1.spider.victim_grounded:
+				action=Pose.ACTION_UNCONTROLLED_FALL
+				progress=fposmod(marsh_hit_time,1.0)
+				if scene1.spider.execution_airborne and scene1.spider.victim_hooked:
+					action=Pose.ACTION_DOWNED
+					progress=clampf((scene1.spider.time-0.20)/1.5,0,1)
 		elif marsh_hit_kind == "crush":
 			action = Pose.ACTION_DOWNED
 			progress = clampf(marsh_hit_time / 1.25, 0.0, 1.0)
@@ -2242,7 +2317,8 @@ func _present(delta: float) -> void:
 		"feet": pose_feet,
 		"velocity": Vector2.ZERO if climb_time >= 0.0 else player.velocity, "grounded": climb_time < 0.0 and (player.is_on_floor() or is_riding()) and marsh_hit_time <= 0.0,
 		"facing": facing, "action": action, "action_progress": progress,
-		"equipment": Pose.EQUIPMENT_THROWABLE if (fan_owned or cliff_pose.equipment == Pose.EQUIPMENT_THROWABLE) else Pose.EQUIPMENT_NONE,
+		"equipment": Pose.EQUIPMENT_THROWABLE if (scene1.predator.owns_bait() or fan_owned or cliff_pose.equipment == Pose.EQUIPMENT_THROWABLE) else Pose.EQUIPMENT_NONE,
+		"held": 0 if scene1.predator.owns_bait() else -1,
 		"small_item_kind": &"fan" if fan_owned else (_cliff_item_kind(cliff_pose)),
 		"small_item_radius": CliffAct.STONE_VISUAL_RADIUS * HOOD_STONE_SCALE,
 		"aim_angle": cliff_pose.aim, "effort": cliff_pose.effort, "aiming": cliff.charging,
@@ -2285,6 +2361,10 @@ func _present(delta: float) -> void:
 		var drop_target := HOOD_RIDE_DROP if (actor == hood_actor and is_riding() and pose.grounded) else 0.0
 		ride_drop = move_toward(ride_drop, drop_target, 70.0 * delta)
 		actor.position.y += ride_drop
+	if actor.has_method("apply_local_impact"):
+		actor.apply_local_impact(scene1.spider.execution_target,scene1.spider.body_impact())
+	scene1.spider.apply_actor(actor)
+	scene1.predator.apply_actor(actor)
 	fan.visible = fan_owned and death_time <= 0.0 and marsh_hit_time <= 0.0 and not dragging and not puzzle_box_dragging
 	fan.set_swing_pose(progress if fan_swing > 0.0 else 0.0)
 	if actor.has_method("drive_fan"):
@@ -2332,6 +2412,8 @@ func _present(delta: float) -> void:
 	iris.call("set_state", _curtain_alpha(), player.position + PLAYER_SIZE * 0.5 - camera_origin)
 	art.sync(delta, camera_x, true)
 	marsh_art.sync(delta, camera_x, true)
+	if descent != null:
+		descent.art.sync(delta, Vector2(camera_x,camera_y),true)
 	if debug_visible:
 		debug_label.text = "C / CONTINUOUS   |   %s\nPLAYER %.0f, %.0f   RAFT %.0f, %.0f   BOX %.0f\nFAN %s   HIT %s   CHECKPOINT %d" % ["COMPLETE" if completed else "PLAY", player.position.x, player.position.y, crate.position.x, crate.position.y, puzzle_box.position.x, fan_owned, marsh_hit_kind, checkpoint]
 
@@ -2477,7 +2559,14 @@ func _act_finished() -> void:
 		_return_to_debug()
 
 func debug_enter_scene1() -> void:
+	if scene1.spider!=null:scene1.spider.reset(true)
+	if scene1.predator!=null:scene1.predator.reset(true)
+	if log_bridge != null:
+		log_bridge.stop()
+	if descent != null:
+		descent.stop()
 	debug_return_index = 4
+	scene1.cp = 0
 	checkpoint = 6
 	checkpoint_fan = false
 	restore_checkpoint()
@@ -2495,7 +2584,37 @@ func debug_enter_scene1() -> void:
 	camera.position.y = 360.0 + camera_y
 	_present(0.0)
 
+func debug_enter_descent() -> void:
+	if log_bridge != null:
+		log_bridge.stop()
+	debug_return_index = 5
+	descent.enter(0)
+
+func debug_enter_log_bridge() -> void:
+	debug_return_index = 6
+	log_bridge.enter(true)
+
+func debug_enter_rope_ladder(with_transition:=false) -> void:
+	debug_enter_scene1()
+	debug_return_index = 7
+	scene1.cut = Scene1Act.Cut.DONE
+	scene1.intro_time = 99.0
+	var top: Vector2 = rope_ladder.anchor()
+	player.position = Vector2(top.x-18-13,Scene1Act.ground_top(top.x-18)-54)
+	player.velocity = Vector2.ZERO
+	if with_transition:
+		scene1.cp=3
+		scene1.cut=Scene1Act.Cut.NONE
+		var approach_x:float=Scene1Act.AUTO_X-30
+		player.position=Vector2(approach_x-13,Scene1Act.ground_top(approach_x)-54)
+	camera_x = clampf(player.position.x-525.0,WORLD_MIN_X,WORLD_WIDTH-1280.0)
+	camera_y = _camera_target_y()
+	camera.position = Vector2(camera_x+640,camera_y+360)
+	_present(0.0)
+
 func debug_enter_forest_act() -> void:
+	if log_bridge != null:
+		log_bridge.stop()
 	debug_return_index = 3
 	checkpoint = 5
 	checkpoint_fan = false
@@ -2515,6 +2634,8 @@ func debug_enter_forest_act() -> void:
 	_present(0.0)
 
 func debug_enter_cliff_act() -> void:
+	if log_bridge != null:
+		log_bridge.stop()
 	debug_return_index = 2
 	checkpoint = 4
 	checkpoint_fan = false

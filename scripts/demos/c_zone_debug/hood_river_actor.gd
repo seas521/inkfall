@@ -72,12 +72,45 @@ func _ready() -> void:
 	super._ready()
 	load_zone("river")
 	load_group("shove")
+	load_group("tired")  # the bent-over panting (scene 1: out of breath at the cliff)
 
 func reset_grip_animation() -> void:
 	held_clip = &"grip_hold"
 	held_frame = 0
 	movement_clip = &""
 	movement_start_distance = grip_distance
+
+func begin_rope_ladder()->void:
+	grip_offset_x=0.0
+	body_offset=Vector2.ZERO
+	support_offset=0.0
+	support_valid=false
+	tail.clear()
+	ghost_time=0.0
+	ghost.hide()
+
+func finish_rope_ladder()->void:
+	# The recorded clip already contains its landing/get-up. Resume normal
+	# locomotion as grounded, without replaying a second impact or stale run.
+	previous_grounded=true
+	on_ground=true
+	ungrounded_time=0.0
+	previous_vertical_speed=0.0
+	landing_time=0.0
+	takeoff_time=0.0
+	prev_windup=-1.0
+	pending_from=0
+	run_hold=0.0
+	loco=&"idle"
+	tail.clear()
+	grip_offset_x=0.0
+	body_offset=Vector2.ZERO
+	run_lean=0.0
+	breath_ramp=0.0
+	breath_time=0.0
+	climb_exit=0.3
+	ghost_time=0.0
+	ghost.hide()
 
 # The player's capsule is round at the bottom, so on slopes, planks and the raft his feet would hover above the surface.
 # Rays from the visible sole down to what he stands on give the small drop that puts them on it (the previous actor
@@ -316,6 +349,8 @@ func _tail_after(finished: StringName) -> Array:
 	return super._tail_after(finished)
 
 func _action_frame() -> Dictionary:
+	if pose.action == &"rope_ladder" and has_clip(&"rope_ladder"):
+		return {"clip": &"rope_ladder", "frame": pose.action_progress*240.0}
 	if pose.action == DROWN_ACTION:
 		return _drown_frame()
 	if pose.alarm and has_clip(&"scared_brake"):

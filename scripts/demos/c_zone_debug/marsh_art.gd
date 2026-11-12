@@ -28,6 +28,7 @@ void fragment() {
 # contour or add a halo: act one's silhouettes are single, calm curves and so are these.
 const INK_SHADER := """shader_type canvas_item;
 uniform float soften = 2.4;
+uniform float opacity = 1.0;
 uniform vec4 ink : source_color = vec4(0.02, 0.021, 0.021, 1.0);
 void fragment() {
 	vec2 px = TEXTURE_PIXEL_SIZE;
@@ -38,7 +39,7 @@ void fragment() {
 		core += texture(TEXTURE, UV + d * soften * 0.55 * px).a * 0.07;
 		core += texture(TEXTURE, UV + d * soften * 1.25 * px).a * 0.035;
 	}
-	COLOR = vec4(ink.rgb, smoothstep(0.05, 0.95, core));
+	COLOR = vec4(ink.rgb, smoothstep(0.05, 0.95, core)*opacity);
 }"""
 
 var level: Node2D
@@ -88,6 +89,7 @@ func _ready() -> void:
 	# rise out along the edge instead of being smeared over the step.
 	gas_back = _layer(self, -2, _draw_gas_back)
 	land = _layer(back_stage.root, 0, _draw_land_static)
+	Scene1Ink.add_boulders(back_stage.root)
 	dyn = _layer(back_stage.root, 3, _draw_dynamic)
 	effects = _layer(self, 6, _draw_effects)
 	grass = _layer(front_stage.root, 0, _draw_grass)
@@ -196,6 +198,8 @@ func sync(delta: float, new_camera_x: float, active: bool) -> void:
 	visible = active
 	var live := active and (new_camera_x > 1400.0 or new_camera_x < -200.0)
 	for stage in [back_stage, front_stage]:
+		(stage.sprite as Sprite2D).modulate.a = 1.0
+		(stage.material as ShaderMaterial).set_shader_parameter("opacity",1.0)
 		(stage.view as SubViewport).render_target_update_mode = SubViewport.UPDATE_ALWAYS if live else SubViewport.UPDATE_DISABLED
 		(stage.sprite as Sprite2D).visible = live
 	if not active:
@@ -218,10 +222,22 @@ func sync(delta: float, new_camera_x: float, active: bool) -> void:
 		(stage.sprite as Sprite2D).position = snapped
 	_sync_flames()
 	_update_effects(delta)
-	dyn.queue_redraw()
-	fog.queue_redraw()
-	gas_back.queue_redraw()
-	effects.queue_redraw()
+	if _redraw_due():
+		dyn.queue_redraw()
+		fog.queue_redraw()
+		gas_back.queue_redraw()
+		effects.queue_redraw()
+
+# Redraws are asked for from the physics step, and Godot draws at the end of every step: when a frame needs two or three steps
+# (it runs late, and a late frame is the one that needs the most), the same expensive drawing was done two or three times in that frame,
+# which made it later still. A node is asked to redraw once per rendered frame, whatever the number of steps in it.
+var _redraw_frame := -1
+func _redraw_due() -> bool:
+	var frame := Engine.get_process_frames()
+	if frame == _redraw_frame:
+		return false
+	_redraw_frame = frame
+	return true
 
 func _visible_x(x: float, pad: float = 180.0) -> bool:
 	return x > camera_x - pad and x < camera_x + SCREEN.x + pad

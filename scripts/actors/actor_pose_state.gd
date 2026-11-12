@@ -41,6 +41,8 @@ const ACTION_GET_UP: StringName = &"get_up"
 const ACTION_UNCONTROLLED_FALL: StringName = &"uncontrolled_fall"
 const ACTION_FALL_IMPACT: StringName = &"fall_impact"
 const ACTION_FALL_DOWNED: StringName = &"fall_downed"
+const ACTION_TIRED_STOP: StringName = &"tired_stop"  # staggers to a halt and bends over (progress 0..1 over the clip)
+const ACTION_PANT: StringName = &"pant"  # bent over, hands on his knees, breathing hard (progress 0..1 is one breath: it loops)
 const ACTION_CLIMB: StringName = &"climb"  # hands over a ledge: hang, pull up, crawl, stand (the clip's root is the ledge corner)
 
 var active := true
@@ -66,7 +68,9 @@ var combo_index := 0
 var small_item_kind: StringName = &""
 var small_item_radius := 8.0
 var small_item_origin := Vector2(-9999.0, -9999.0)  # screen position where the item lay before it was picked up
-var visual_scale := 1.0
+# Shared gameplay size. Scene composition must not resize the player.
+const HOOD_VISUAL_SCALE := 0.90
+var visual_scale := HOOD_VISUAL_SCALE
 var fog_blur := 0.0
 var monochrome := false
 var clip_flip_h := false
@@ -99,7 +103,7 @@ func apply(source: Dictionary) -> void:
 	small_item_kind = StringName(source.get("small_item_kind", ""))
 	small_item_radius = maxf(4.0, float(source.get("small_item_radius", 8.0)))
 	small_item_origin = Vector2(source.get("small_item_origin", Vector2(-9999.0, -9999.0)))
-	visual_scale = clampf(float(source.get("visual_scale", 1.0)), 0.5, 1.5)
+	visual_scale = clampf(float(source.get("visual_scale", HOOD_VISUAL_SCALE)), 0.5, 1.5)
 	fog_blur = clampf(float(source.get("fog_blur", 0.0)), 0.0, 4.0)
 	monochrome = bool(source.get("monochrome", false))
 	clip_flip_h = bool(source.get("clip_flip_h", false))

@@ -1,0 +1,126 @@
+{
+  "legs": [
+    {
+      "hip": "LeftLeg1Hip",
+      "knee": "LeftLeg1Knee",
+      "tip": "LeftLeg1Tip",
+      "foot_local": [
+        0.14788023320851895,
+        -0.32248319999999997,
+        0.25171456815640836
+      ],
+      "front": true,
+      "side": 1,
+      "number": 1
+    },
+    {
+      "hip": "LeftLeg2Hip",
+      "knee": "LeftLeg2Knee",
+      "tip": "LeftLeg2Tip",
+      "foot_local": [
+        0.12719439377806063,
+        -0.30577920000000014,
+        0.08796293068574901
+      ],
+      "front": true,
+      "side": 1,
+      "number": 2
+    },
+    {
+      "hip": "LeftLeg3Hip",
+      "knee": "LeftLeg3Knee",
+      "tip": "LeftLeg3Tip",
+      "foot_local": [
+        0.12533328876023697,
+        -0.23418880000000009,
+        -0.0625489706981488
+      ],
+      "front": false,
+      "side": 1,
+      "number": 3
+    },
+    {
+      "hip": "LeftLeg4Hip",
+      "knee": "LeftLeg4Knee",
+      "tip": "LeftLeg4Tip",
+      "foot_local": [
+        0.0037731069492532576,
+        -0.2458688,
+        -0.2651904062443524
+      ],
+      "front": false,
+      "side": 1,
+      "number": 4
+    },
+    {
+      "hip": "RightLeg1Hip",
+      "knee": "RightLeg1Knee",
+      "tip": "RightLeg1Tip",
+      "foot_local": [
+        -0.14788023320851895,
+        -0.32248319999999997,
+        0.25171456815640836
+      ],
+      "front": true,
+      "side": -1,
+      "number": 1
+    },
+    {
+      "hip": "RightLeg2Hip",
+      "knee": "RightLeg2Knee",
+      "tip": "RightLeg2Tip",
+      "foot_local": [
+        -0.12719439377806063,
+        -0.30577920000000014,
+        0.08796293068574901
+      ],
+      "front": true,
+      "side": -1,
+      "number": 2
+    },
+    {
+      "hip": "RightLeg3Hip",
+      "knee": "RightLeg3Knee",
+      "tip": "RightLeg3Tip",
+      "foot_local": [
+        -0.12533328876023697,
+        -0.23418880000000009,
+        -0.0625489706981488
+      ],
+      "front": false,
+      "side": -1,
+      "number": 3
+    },
+    {
+      "hip": "RightLeg4Hip",
+      "knee": "RightLeg4Knee",
+      "tip": "RightLeg4Tip",
+      "foot_local": [
+        -0.0037731069492532576,
+        -0.2458688,
+        -0.2651904062443524
+      ],
+      "front": false,
+      "side": -1,
+      "number": 4
+    }
+  ],
+  "source_params": {
+    "legReach": 1.1,
+    "legThickness": 0.85,
+    "stance": 1.08,
+    "fullness": 0.9
+  },
+  "derivative": {
+    "reach_multiplier": 1.25,
+    "tube_radius_multiplier": 0.34,
+    "tip_radius_multiplier": 0.26,
+    "hips_lift": 0.6,
+    "knee_lift": 0.82,
+    "abdomen_scale": [
+      0.78,
+      0.78,
+      0.8
+    ]
+  }
+}

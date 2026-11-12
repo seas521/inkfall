@@ -5,14 +5,38 @@ const Fan = preload("res://scripts/demos/c_zone_debug/fan_art.gd")
 const CrookedTree = preload("res://scripts/demos/c_zone_debug/crooked_tree_art.gd")
 const LIGHT = preload("res://assets/shaders/cinematic_light_cone.gdshader")
 const SCREEN := Vector2(1280, 720)
+const DESTINATION_FIRE_UV := Vector2(0.884,0.447)
+const DESTINATION_INK := 0.22
+const DESTINATION_TREE = preload("res://assets/art/descent/rope-ladder/destination-yard-tree-v2.png")
+const DESTINATION_TREE_SCALE := 0.130631135
+const DESTINATION_TREE_ROOT := Vector2(521,1456)
 const INK := Color("050606")
 const SurfaceArt = preload("res://scripts/art/surface_layered_art.gd")
+const SurfaceBatFlock = preload("res://scripts/art/surface_bat_flock.gd")
+const HunterArt = preload("res://scripts/demos/c_zone_debug/hunter_art.gd")
 const Scene1Ref = preload("res://scripts/demos/c_zone_debug/scene1_act.gd")
+const ForestPlates = preload("res://scripts/demos/c_zone_debug/forest_plates.gd")
+const GRASS_STRIP = preload("res://assets/art/c_zone_debug/forest/forest_grass_strip.jpg")
+const BOULDER = preload("res://assets/art/c_zone_debug/forest/forest_boulder_block.jpg")
+const BRAMBLE = preload("res://assets/art/c_zone_debug/forest/forest_bramble.jpg")
+const FALLEN_LOG = preload("res://assets/art/c_zone_debug/forest/forest_fallen_log.jpg")
+const CreviceArt=preload("res://scripts/art/rock_crevice_art.gd")
+const SpiderArt=preload("res://scripts/art/forest_spider_art.gd")
+const PredatorArt = preload("res://scripts/art/forest_predator_art.gd")
+const MistyForest = preload("res://scripts/demos/c_zone_debug/misty_forest.gd")
+# how bright the fog is along scene 1 (0 = where he wakes, 1 = the cliff): dark at first, the clearing is the brightest
+const FOG_LEVEL_KEYS := [Vector2(0.0, 0.54), Vector2(0.08, 0.58), Vector2(0.30, 0.62), Vector2(0.46, 0.80), Vector2(0.56, 0.96), Vector2(0.70, 0.80), Vector2(1.0, 0.72)]
 
 var level: Node2D
 var clock := 0.0
 var camera_x := 0.0
 var background: Sprite2D
+var plates_far:Node2D
+var plates_mid:Node2D
+var plates_close:Node2D
+var forest_back: ColorRect
+var opening_back: ColorRect
+var route_back: ColorRect
 var mid: Node2D
 var terrain: Node2D
 var props: Node2D
@@ -56,9 +80,32 @@ var cone_act_two: ColorRect
 var cone_forest: ColorRect
 var surface_layer: CanvasLayer
 var surface_art: Node2D
+var landmark_layer:CanvasLayer
+var landmark_view:SubViewport
+var landmark_output:Sprite2D
 var fan_pickup: Node2D
 var mid_view: SubViewport
 var fore_view: SubViewport
+var near_view: SubViewport
+var near_blur_sprite: Sprite2D
+var plates_near: Node2D
+var opening_trees: Node2D
+var opening_middle: Node2D
+var grass_art: Node2D
+var _grass_cached_edge := INF
+var _grass_edge_weights:=PackedFloat32Array()
+var _grass_weight_origin:=0.0
+const GRASS_WEIGHT_STEP:=2.0
+var grass_band: Node2D
+var weather_art: Node2D  # scene 1's cliff: rain, blown leaves, dust (screen space, over the world, under the lens)
+var bat_flock: Node2D  # level 1's flock, for the scene 1 cliff
+var crevice_art:Node2D
+var spider_art:Node2D
+var predator_art: Node2D
+var hunter_art: Node2D  # scene 1's hunter: the lantern, the foot, the arm
+var weather_level := 0.0
+var weather_gust := 0.0
+var weather_time := 0.0  # runs faster in the flock's wind
 var mid_blur_sprite: Sprite2D
 var fore_blur_sprite: Sprite2D
 var bank_noise := FastNoiseLite.new()
@@ -79,7 +126,6 @@ func _ready() -> void:
 	var back_shader := Shader.new()
 	back_shader.code = """shader_type canvas_item;
 uniform float reveal_edge = 2.0;
-uniform float calm = 0.0;
 uniform float reveal_soft = 0.34;
 float hash21(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
 float vnoise(vec2 p) {
@@ -105,21 +151,102 @@ void fragment() {
 	float columns = (vnoise(vec2(SCREEN_UV.x * 16.0, 1.0)) - 0.5) * 0.34 + (vnoise(vec2(SCREEN_UV.x * 5.0, UV.y * 3.0)) - 0.5) * 0.22;
 	float front = reveal_edge + (vnoise(vec2(UV.y * 5.0, 3.0)) - 0.5) * 0.28 + (UV.y - 0.5) * 0.18;
 	float keep = 1.0 - smoothstep(front - reveal_soft, front + reveal_soft, SCREEN_UV.x + columns);
-	v = mix(v, 0.40, 0.55 * calm) * mix(1.0, 0.80, calm);  // scene 1: the backdrop is calmer (less contrast), so what matters stands out
 	COLOR = vec4(vec3(v * 0.83 + 0.075), keep);
 }"""
 	var mat := ShaderMaterial.new()
 	mat.shader = back_shader
 	background.material = mat
 	back_layer.add_child(background)
+	# scenes 1 to 6 are in the forest: its backdrop is made by the misty forest shader (the panorama above is for the C zone)
+	forest_back = MistyForest.new()
+	forest_back.visible = false
+	back_layer.add_child(forest_back)
+	plates_far=ForestPlates.new()
+	plates_far.setup(&"far",0.16,1500.0,1700.0,0.85,0.58)
+	back_layer.add_child(plates_far)
+	plates_mid=ForestPlates.new()
+	plates_mid.setup(&"mid",0.32,1900.0,2100.0,1.0,0.20)
+	back_layer.add_child(plates_mid)
+	route_back = ColorRect.new()
+	route_back.size = SCREEN
+	route_back.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var route_material := ShaderMaterial.new()
+	route_material.shader = preload("res://assets/shaders/forest_route_v1.gdshader")
+	route_material.set_shader_parameter("forest_plate", preload("res://assets/art/c_zone_debug/forest/forest-route-chiaroscuro-v1.png"))
+	route_back.material = route_material
+	back_layer.add_child(route_back)
+	opening_back = ColorRect.new()
+	opening_back.size = SCREEN
+	opening_back.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var opening_material := ShaderMaterial.new()
+	opening_material.shader = preload("res://assets/shaders/forest_opening_v5.gdshader")
+	opening_material.set_shader_parameter("forest_plate", preload("res://assets/art/c_zone_debug/forest/forest_opening_chiaroscuro_v5.png"))
+	opening_material.set_shader_parameter("right_plate", preload("res://assets/art/c_zone_debug/forest/forest-opening-right-tree-v6.png"))
+	opening_back.material = opening_material
+	back_layer.add_child(opening_back)
+	opening_middle = ForestPlates.new()
+	opening_middle.setup(&"mid",0.34,1150.0,1100.0,0.56,0.25)
+	back_layer.add_child(opening_middle)
+	plates_close=ForestPlates.new()
+	plates_close.setup(&"close",0.50,1650.0,630.0,1.0,0.055)
+	back_layer.add_child(plates_close)
+	opening_trees = ForestPlates.new()
+	opening_trees.setup(&"close",0.82,1500.0,470.0,1.0,0.035)
+	back_layer.add_child(opening_trees)
+	for sprite in opening_trees.sprites:
+		(sprite.material as ShaderMaterial).set_shader_parameter("root_haze",0.0)
 	# The original cliff-top picture (the far valley, the cliffs, the house across the gap with its fire, the swaying yard tree), kept as it
 	# was: here it is placed in the world at the edge of scene 1's cliff, and it fades in as he comes near.
 	surface_layer = CanvasLayer.new()
-	surface_layer.layer = -11  # behind the forest backdrop, which is cut away to uncover it
+	surface_layer.layer = -12
 	add_child(surface_layer)
 	surface_art = SurfaceArt.new()
 	surface_art.far_mode = true
 	surface_layer.add_child(surface_art)
+	# The destination ridge, cabin and tree are one continuous graded plate.
+	# Only the live campfire is composited above it, on the same parallax.
+	landmark_layer=CanvasLayer.new()
+	landmark_layer.layer=-11
+	add_child(landmark_layer)
+	landmark_view=SubViewport.new()
+	landmark_view.size=Vector2i(1280,720)
+	landmark_view.transparent_bg=true
+	landmark_view.disable_3d=true
+	landmark_layer.add_child(landmark_view)
+	surface_art.far_group.reparent(landmark_view,false)
+	surface_art.far_mist.hide()
+	# Keep the authored cabin, its actual window and the full workbench yard.
+	surface_art.gameplay_sprite.region_rect=Rect2(1130,220,542,240)
+	surface_art.gameplay_region_offset=Vector2(1130,220)*SurfaceArt.PLATE_SCALE
+	surface_art.gameplay_sprite.material.set_shader_parameter("original_destination",true)
+	surface_art.gameplay_sprite.material.set_shader_parameter("low",DESTINATION_INK)
+	surface_art.gameplay_sprite.material.set_shader_parameter("high",DESTINATION_INK)
+	surface_art.gameplay_sprite.material.set_shader_parameter("spread",2.0)
+	surface_art.tree_material.set_shader_parameter("ink",DESTINATION_INK)
+	surface_art.tree_sprite.texture=DESTINATION_TREE
+	surface_art.tree_sprite.scale=Vector2.ONE*DESTINATION_TREE_SCALE
+	landmark_output=Sprite2D.new()
+	landmark_output.centered=false
+	landmark_output.texture=landmark_view.get_texture()
+	var landmark_shader:=Shader.new()
+	landmark_shader.code="""shader_type canvas_item;
+uniform float exposure=1.0;
+void fragment(){
+ vec2 d=TEXTURE_PIXEL_SIZE*2.0;
+ vec4 c=texture(TEXTURE,UV)*0.25;
+ c+=(texture(TEXTURE,UV+vec2(d.x,0))+texture(TEXTURE,UV-vec2(d.x,0))+texture(TEXTURE,UV+vec2(0,d.y))+texture(TEXTURE,UV-vec2(0,d.y)))*0.125;
+ c+=(texture(TEXTURE,UV+d)+texture(TEXTURE,UV-d)+texture(TEXTURE,UV+vec2(d.x,-d.y))+texture(TEXTURE,UV+vec2(-d.x,d.y)))*0.0625;
+ // Terrain, original yard props and flame are rendered into the SAME
+ // opaque image before this common lens pass, avoiding separate grading.
+ vec3 unified=pow(max(c.rgb,vec3(0.0)),vec3(1.0/2.2));
+ float l=dot(unified,vec3(0.299,0.587,0.114));
+ COLOR=vec4(vec3(l),c.a*exposure);
+}
+"""
+	var landmark_material:=ShaderMaterial.new()
+	landmark_material.shader=landmark_shader
+	landmark_output.material=landmark_material
+	landmark_layer.add_child(landmark_output)
 	mid_view = _blur_layer(back_layer, 8.0)
 	mid_blur_sprite = mid_view.get_meta(&"output_sprite") as Sprite2D
 	mid = Node2D.new()
@@ -161,6 +288,16 @@ void fragment() {
 	light_forest.set_shader_parameter("light_tint", Vector3(0.70, 0.70, 0.70))
 	cone_forest.material = light_forest
 	back_layer.add_child(cone_forest)
+	_build_scene1_props()
+	predator_art=PredatorArt.new()
+	predator_art.encounter=level.scene1.predator
+	add_child(predator_art)
+	spider_art=SpiderArt.new()
+	spider_art.encounter=level.scene1.spider
+	add_child(spider_art)
+	crevice_art=CreviceArt.new()
+	crevice_art.scene=level.scene1
+	add_child(crevice_art)
 	terrain = Node2D.new()
 	terrain.z_index = -2
 	terrain.draw.connect(_draw_terrain)
@@ -214,19 +351,159 @@ void fragment() {
 	shore_material.set_shader_parameter("bank_height",water_volume.material.get_shader_parameter("bank_height"))
 	surface.material = shore_material
 	add_child(surface)
+	var weather_layer := CanvasLayer.new()
+	weather_layer.layer = 14
+	add_child(weather_layer)
+	weather_art = Node2D.new()
+	weather_art.draw.connect(_draw_weather)
+	weather_art.visible = false
+	weather_layer.add_child(weather_art)
+	bat_flock = SurfaceBatFlock.new()
+	weather_layer.add_child(bat_flock)
+	if Scene1Ref.HUNTER_ON:
+		hunter_art = HunterArt.new()
+		add_child(hunter_art)
+		hunter_art.setup(level, self)
 	var front_layer := CanvasLayer.new()
 	front_layer.layer = 15
 	add_child(front_layer)
+	near_view = _blur_layer(front_layer, 9.0)
+	near_blur_sprite = near_view.get_meta(&"output_sprite") as Sprite2D
+	(near_blur_sprite.material as ShaderMaterial).set_shader_parameter("window", 0.9)
+	plates_near = ForestPlates.new()
+	plates_near.setup(&"near", 1.45, 1500.0, 1500.0)
+	plates_near.root_guard=Callable(self,"_near_tree_land_range")
+	plates_near.root_ground=Callable(level.scene1,"ground_top")
+	plates_near.initial_index=int(floor((Scene1Ref.START_X-525.0)*1.45/1500.0))
+	near_view.add_child(plates_near)
 	fore_view = _blur_layer(front_layer, 6.0)
 	fore_blur_sprite = fore_view.get_meta(&"output_sprite") as Sprite2D
 	foreground = Node2D.new()
 	foreground.draw.connect(_draw_foreground)
 	fore_view.add_child(foreground)
+	grass_band = Node2D.new()  # the low, solid mat the blades grow out of (see _draw_grass_band)
+	grass_band.draw.connect(_draw_grass_band)
+	front_layer.add_child(grass_band)
+	grass_art = Node2D.new()
+	grass_art.draw.connect(_draw_ground_grass)
+	var grass_material := ShaderMaterial.new()
+	var grass_shader := Shader.new()
+	grass_shader.code = GRASS_SLICE_SHADER
+	grass_material.shader = grass_shader
+	grass_art.material = grass_material
+	front_layer.add_child(grass_art)
 	lens = ColorRect.new()
 	lens.size = SCREEN
 	lens.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	lens.material = _atmosphere_material(true)
 	front_layer.add_child(lens)
+
+# The weather of level 1's cliff (_draw_surface_weather there: 72 slanted rain streaks, 15 dark leaves blown across), with a little
+# dust, here on a pale misty picture, so the strokes are dark and faint; in the flock's wind they slant, speed up and thicken.
+func _draw_weather() -> void:
+	var level_now := weather_level
+	if level_now <= 0.01:
+		return
+	var wind := weather_gust
+	for i in 72:
+		var depth := float(i % 3) / 2.0
+		var speed := 300.0 + float(i % 5) * 34.0 + depth * 110.0
+		var drift := 48.0 + float(i % 4) * 12.0 + wind * 240.0
+		var x := fposmod(float(i) * 79.37 - clock * drift, SCREEN.x + 160.0) - 80.0
+		var y := fposmod(float(i) * 137.11 + clock * speed, SCREEN.y + 120.0) - 80.0
+		var length := 12.0 + float(i % 4) * 5.0 + depth * 9.0
+		var slant := 0.22 + wind * 0.8
+		weather_art.draw_line(Vector2(x, y), Vector2(x - length * slant, y + length), Color(0.15, 0.16, 0.16, (0.07 + depth * 0.09) * level_now), 1.0 + depth * 0.5)
+	# dust, blown with the leaves: fine specks, drifting left and a little up and down
+	for i in 64:
+		var depth := float(i % 4) / 3.0
+		var age := fposmod(weather_time * (0.030 + float(i % 5) * 0.006) + float(i) * 0.171, 1.0)
+		var x := SCREEN.x + 60.0 - age * (SCREEN.x + 140.0) * (1.0 + float(i % 3) * 0.1)
+		var y := fposmod(float(i) * 97.0, 560.0) + 40.0 + sin(age * TAU * 2.0 + float(i)) * (6.0 + depth * 10.0)
+		var fade := sin(age * PI)
+		weather_art.draw_circle(Vector2(x, y), 0.7 + depth * 1.1, Color(0.30, 0.31, 0.30, (0.10 + depth * 0.16) * fade * level_now))
+	for i in 15:
+		var age := fposmod(weather_time * (0.10 + float(i % 4) * 0.018) + float(i) * 0.137, 1.0)
+		var x := 1350.0 - age * 1510.0 + sin(age * TAU * 2.0 + float(i)) * 45.0
+		var y := 85.0 + float(i % 5) * 86.0 + sin(age * TAU + float(i)) * 34.0
+		var angle := weather_time * 2.0 + float(i)
+		var direction := Vector2(cos(angle), sin(angle))
+		weather_art.draw_line(Vector2(x, y) - direction * 5.0, Vector2(x, y) + direction * 5.0, Color(0.018, 0.020, 0.019, 0.58 * level_now), 3.0, true)
+
+# scene 1's fallen trees: an image of a fallen trunk (black on white, the white is cut away) laid over each log obstacle, so that its top
+# lines up with the collision (the log's start is where the trunk proper begins, the torn roots hang out to its left)
+# The ground grass is drawn in slices of a strip image (eleven slices in the image's width). A slice ends in a straight vertical line, so
+# every slice fades out at its two sides (fract(UV.x * 11) is where we are in a slice): where two overlap, the grass goes on without a cut.
+const GRASS_SLICE_SHADER := """shader_type canvas_item;
+uniform vec4 ink : source_color = vec4(0.012, 0.013, 0.013, 1.0);
+uniform float camera_x = 0.0;
+varying float patch_alpha;
+void vertex(){patch_alpha=COLOR.a;}
+void fragment() {
+	float opening=1.0-smoothstep(-4900.0,-4200.0,camera_x+SCREEN_UV.x*1280.0);
+	float radius=opening*(3.5+2.0*smoothstep(0.3,0.8,SCREEN_UV.y));
+	float l=dot(texture(TEXTURE,UV).rgb,vec3(0.299,0.587,0.114));
+	if(opening>0.001){
+		float sum=0.0;
+		float total=0.0;
+		for(int y=-2;y<=2;y++){
+			for(int x=-2;x<=2;x++){
+				float w=exp(-float(x*x+y*y)/3.0);
+				sum+=dot(texture(TEXTURE,UV+vec2(float(x),float(y))*TEXTURE_PIXEL_SIZE*radius).rgb,vec3(0.299,0.587,0.114))*w;
+				total+=w;
+			}
+		}
+		l=sum/total;
+	}
+	float f = fract(UV.x * 11.0);
+	float side = smoothstep(0.02, 0.30, f) * (1.0 - smoothstep(0.70, 0.98, f));
+	float mask=mix(1.0-smoothstep(0.20,0.80,l),1.0-l,opening);
+	COLOR = vec4(ink.rgb, mask * side * patch_alpha);
+}"""
+
+func _build_scene1_props() -> void:
+	var shader := preload("res://assets/shaders/forest_prop_soft_ink.gdshader")
+	for f: Dictionary in Scene1Ref.FEATURES:
+		var kind := String(f["t"])
+		var texture: Texture2D = null
+		var scale_factor := 1.0
+		var pos := Vector2.ZERO
+		var boulder_scale_y := 0.0
+		if kind == "log":
+			# in the 1280 x 720 image the trunk proper runs from x 270 to 1230, its top is at y 375 and its foot at y 495
+			texture = FALLEN_LOG
+			scale_factor = float(f["len"]) / 960.0
+			pos = Vector2(Scene1Ref.fx(f) - 270.0 * scale_factor, Scene1Ref.GROUND_Y - float(f["h"]) + 1.0 - 375.0 * scale_factor)
+		elif kind == "boulder":
+			continue  # (a boulder is part of the ground: scene1_ink.gd, add_boulders, in the ink stage)
+			# the image's silhouette is the collision (Scene1Ref.boulder_points); the sprite is placed with the same numbers
+			texture = BOULDER
+			var k := texture.get_width() / 1024.0  # (the image is 1280 wide, the numbers are on a 1024-wide view: a texture pixel is 1/k view pixel)
+			var sc := Scene1Ref.boulder_scale(f)
+			var cx := Scene1Ref.fx(f)
+			scale_factor = sc.x / k
+			pos = Vector2(cx - Scene1Ref.BOULDER_CENTRE_X * sc.x, Scene1Ref.ground_top(cx) + Scene1Ref.BOULDER_SINK - Scene1Ref.BOULDER_BOTTOM_Y * sc.y)
+			boulder_scale_y = sc.y / k
+		elif kind == "spikes":
+			# the thicket spans x 75..950, y 95..480 of the 1024-wide view, centre 512
+			texture = BRAMBLE
+			var k2 := texture.get_width() / 1024.0
+			scale_factor = float(f["w"]) * 1.5 / (875.0 * k2)
+			var cx2 := Scene1Ref.fx(f) + float(f["w"]) * 0.5
+			pos = Vector2(cx2 - 512.0 * k2 * scale_factor, Scene1Ref.ground_top(cx2) + 4.0 - 480.0 * k2 * scale_factor)
+		if texture == null:
+			continue
+		var sprite := Sprite2D.new()
+		sprite.centered = false
+		sprite.texture = texture
+		sprite.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS
+		var material_value := ShaderMaterial.new()
+		material_value.shader = shader
+		sprite.material = material_value
+		sprite.scale = Vector2(scale_factor, boulder_scale_y) if boulder_scale_y > 0.0 else Vector2.ONE * scale_factor
+		sprite.position = pos
+		sprite.z_index = 0
+		add_child(sprite)
 
 func _build_water_volume() -> void:
 	water_volume = Polygon2D.new()
@@ -601,6 +878,7 @@ func emit_struggle_splash(x: float, side: float) -> void:
 const BLUR_SHADER := """shader_type canvas_item;
 uniform vec2 direction = vec2(1.0, 0.0);
 uniform float sigma = 4.0;
+uniform float window = 0.0;  // fades the layer out round where the hero stands (screen x about 500)
 void fragment() {
 	vec2 step_uv = TEXTURE_PIXEL_SIZE * direction;
 	vec4 sum = vec4(0.0);
@@ -612,6 +890,7 @@ void fragment() {
 		total += w;
 	}
 	COLOR = sum / total;
+	COLOR.a *= 1.0 - window * (1.0 - smoothstep(170.0, 540.0, abs(SCREEN_UV.x * 1280.0 - 500.0)));
 }"""
 
 func _blur_material(direction: Vector2, sigma: float) -> ShaderMaterial:
@@ -656,6 +935,10 @@ func _atmosphere_material(is_lens: bool) -> ShaderMaterial:
 uniform float clock = 0.0;
 uniform float scroll = 0.0;
 uniform bool lens = false;
+uniform float atmosphere_strength = 1.0;
+uniform float vignette = 0.34;
+uniform float grain = 0.018;
+uniform float cinema = 0.0;
 float hash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
 float noise(vec2 p) {
 	vec2 i = floor(p); vec2 f = fract(p); f = f*f*(3.0-2.0*f);
@@ -664,13 +947,18 @@ float noise(vec2 p) {
 void fragment() {
 	if (lens) {
 		float edge = smoothstep(0.30, 0.79, length((UV-0.5)*vec2(0.93,1.0)));
-		float grain = hash(floor(UV*vec2(1280,720))+floor(clock*12.0));
-		COLOR = vec4(vec3(0.0), edge * 0.34 + grain * 0.018);
+		float speckle = hash(floor(UV*vec2(1280,720))+floor(clock*12.0));
+		// A 2.2:1 forest shot within the unchanged gameplay viewport.
+		// The lower matte ends below the grounded actor and readable obstacles.
+		float matte = 1.0 - smoothstep(0.092, 0.096, min(UV.y, 1.0-UV.y));
+		// Global elliptical enclosure is applied once by film_look.gdshader.
+		float surround = clamp(edge*vignette + speckle*grain,0.0,0.97);
+		COLOR = vec4(vec3(0.0), mix(surround,1.0,matte*cinema));
 	} else {
 		float a = noise(UV*vec2(3.2,8.0)+vec2(clock*0.018+scroll*0.0001,0));
 		float b = noise(UV*vec2(5.0,12.0)-vec2(clock*0.030,clock*0.008));
 		float band = exp(-pow((UV.y-0.65)*4.4,2.0));
-		COLOR = vec4(vec3(0.72), (a*0.65+b*0.35)*band*0.15);
+		COLOR = vec4(vec3(0.72), (a*0.65+b*0.35)*band*0.15*atmosphere_strength);
 	}
 }"""
 	var result := ShaderMaterial.new()
@@ -681,9 +969,21 @@ void fragment() {
 # 0 deep in the forest, 1 when he steps out of the trees onto the open ground: the dark forest backdrop gives way to the wide valley
 # as the trunks thin out (the trees along the route end where this reaches 1).
 func _emergence() -> float:
-	return smoothstep(-6000.0, -4800.0, camera_x)
+	return smoothstep(-5000.0, -4100.0, camera_x)
+
+# Redraws are asked for from the physics step, and Godot draws at the end of every step: when a frame needs two or three steps
+# (it runs late, and a late frame is the one that needs the most), the same expensive drawing was done two or three times in that frame,
+# which made it later still. A node is asked to redraw once per rendered frame, whatever the number of steps in it.
+var _redraw_frame := -1
+func _redraw_due() -> bool:
+	var frame := Engine.get_process_frames()
+	if frame == _redraw_frame:
+		return false
+	_redraw_frame = frame
+	return true
 
 func sync(delta: float, new_camera: float, active: bool) -> void:
+	var redraw := _redraw_due()
 	visible = active
 	clock += delta
 	camera_x = new_camera
@@ -692,13 +992,108 @@ func sync(delta: float, new_camera: float, active: bool) -> void:
 	var emergence := _emergence()
 	surface_layer.visible = camera_x < -2400.0
 	# the forest backdrop is cut away from the right, so the valley opens up ahead of him before the trees are gone
-	(background.material as ShaderMaterial).set_shader_parameter("calm", 1.0 - smoothstep(-2600.0, -1200.0, camera_x))
-	(background.material as ShaderMaterial).set_shader_parameter("reveal_edge", lerpf(1.55, -0.35, emergence) if camera_x < -2400.0 else 2.0)
+	# A fixed world-space forest edge. Walking past it reveals the valley
+	# already behind the trees; no screen-wide backdrop crossfade.
+	var reveal: float = (Scene1Ref.CLIFF_X-1050.0-camera_x)/1280.0 if camera_x < -2400.0 else 2.0
+	(background.material as ShaderMaterial).set_shader_parameter("reveal_edge", reveal)
+	var gorge_mix:float=level.rope_ladder.entry_mix() if level.rope_ladder != null else 0.0
+	var in_forest:bool = camera_x < -2400.0 and not (level.descent != null and level.descent.enabled)
+	# Image planes are part of this forest bank. None may grow over the void
+	# beyond the actual cliff, even if the plate contains an offscreen trunk.
+	for plane in [plates_far,plates_mid,plates_close,plates_near]:
+		plane.set_ground_limit(Scene1Ref.edge_x()-camera_x)
+	if hunter_art != null:
+		hunter_art.sync(delta, camera_x, float(level.camera_y), level.scene1.hunter if level.scene1 != null else null, active and camera_x < -2400.0)
+	weather_level = Scene1Ref.weather(camera_x)
+	weather_gust = level.scene1.gust() if level.scene1 != null else 0.0
+	weather_time += delta * (1.0 + 2.5 * weather_gust)
+	weather_art.visible = weather_level > 0.01 and active
+	if weather_art.visible and redraw:
+		weather_art.queue_redraw()
+	var flock_time: float = level.scene1.flock_clock() if level.scene1 != null else -1.0
+	if flock_time >= 0.0 and active:
+		var player_centre: Vector2 = level.player.position + Vector2(13.0, 27.0)
+		# up out of the chasm, not from under the ground: the flock starts over the far side of the edge
+		var grave:Vector2=Scene1Ref.grave_position()-Vector2(camera_x,float(level.camera_y))
+		bat_flock.start_spread=Vector2(68,24)
+		bat_flock.start_shift=grave-Vector2(528+34,748+18)
+		bat_flock.approach_arc = 210.0
+		bat_flock.sync(delta, flock_time, player_centre - Vector2(camera_x, 0.0), float(level.camera_y), true)
+	else:
+		bat_flock.sync(delta, 0.0, Vector2.ZERO, 0.0, false)
+	background.visible = not in_forest
+	(atmosphere.material as ShaderMaterial).set_shader_parameter("atmosphere_strength", 0.0 if in_forest else 1.0)
+	forest_back.visible = in_forest
+	route_back.visible = in_forest
+	var route_material := route_back.material as ShaderMaterial
+	route_material.set_shader_parameter("scroll", camera_x)
+	route_material.set_shader_parameter("clock", clock)
+	route_material.set_shader_parameter("ground_y", Scene1Ref.GROUND_Y-float(level.camera_y))
+	route_material.set_shader_parameter("reveal_edge", reveal)
+	opening_back.visible = in_forest and camera_x < -7500.0
+	var opening_material := opening_back.material as ShaderMaterial
+	opening_material.set_shader_parameter("scroll",camera_x)
+	opening_material.set_shader_parameter("clock",clock)
+	opening_material.set_shader_parameter("ground_y",Scene1Ref.GROUND_Y-float(level.camera_y))
+	(grass_art.material as ShaderMaterial).set_shader_parameter("camera_x",camera_x if in_forest else 0.0)
+	plates_far.visible=in_forest
+	plates_mid.visible=in_forest
+	plates_close.visible=in_forest
+	opening_trees.visible=in_forest
+	opening_middle.visible=in_forest
+	if in_forest:
+		var ground_screen:float=Scene1Ref.GROUND_Y-float(level.camera_y)
+		opening_middle.set_fade(0.0)
+		opening_middle.sync(camera_x,ground_screen,(Scene1Ref.START_X+2400.0)*0.34)
+		opening_trees.set_fade(0.0)
+		opening_trees.sync(camera_x,ground_screen,(Scene1Ref.START_X+2200.0)*0.82)
+		plates_far.set_fade(1.0-smoothstep(-8800.0,-8100.0,camera_x))
+		plates_mid.set_fade(1.0-smoothstep(-8800.0,-8100.0,camera_x))
+		plates_close.set_fade(0.0)
+		plates_far.sync(camera_x,ground_screen-30.0,(Scene1Ref.START_X-525.0)*.16+1700.0)
+		plates_mid.sync(camera_x,ground_screen,(Scene1Ref.START_X-525.0)*.32+1500.0)
+		plates_close.sync(camera_x,ground_screen,(Scene1Ref.START_X-525.0)*.50+700.0)
+		plates_near.set_fade(1.0 - smoothstep(-4800.0, -4200.0, camera_x))
+		var route := clampf((camera_x + 525.0 - Scene1Ref.START_X) / (Scene1Ref.CLIFF_X - Scene1Ref.START_X), 0.0, 1.0)
+		var centre := camera_x + 640.0
+		var shaft_strength := 1.0 - smoothstep(500.0, 1900.0, absf(centre - Scene1Ref.LIGHT_X))
+		var shaft_screen := 640.0 + (Scene1Ref.LIGHT_X - centre) * 0.30
+		var trees := 1.0 - 0.85 * smoothstep(0.68, 0.95, route)
+		forest_back.sync(camera_x, clock, Scene1Ref.GROUND_Y - float(level.camera_y), MistyForest.keyed(FOG_LEVEL_KEYS, route), shaft_strength, shaft_screen, trees, reveal)
+	# the vignette closes in and the grain thickens in the forest, and both let go as he comes out of the trees
+	predator_art.sync(delta,camera_x,float(level.camera_y),active and in_forest)
+	spider_art.sync(delta,camera_x,float(level.camera_y),active and in_forest)
+	crevice_art.sync(delta,camera_x,float(level.camera_y),active and in_forest)
+	var forest_context:bool=camera_x < -2400.0 and float(level.camera_y)<-4250.0 and not (level.descent != null and level.descent.enabled)
+	var closed:float=(1.0-emergence*0.45)*(1.0-emergence) if forest_context else 0.0
+	var chase_pressure: float = level.scene1.hunter.pressure if (level.scene1 != null and level.scene1.hunter != null and camera_x < -2400.0) else 0.0
+	(lens.material as ShaderMaterial).set_shader_parameter("vignette", lerpf(0.34, 0.74, closed) + 0.16 * chase_pressure)
+	(lens.material as ShaderMaterial).set_shader_parameter("grain", lerpf(0.018, 0.045, closed))
+	(lens.material as ShaderMaterial).set_shader_parameter("cinema", closed)
 	if surface_layer.visible:
-		# the far cliff drifts slowly with the camera, and rises out of the picture as he goes down
-		var far_shift := Vector2(-(camera_x + 5000.0) * 0.015, -(float(level.camera_y) + 4850.0) * 0.10)
-		surface_art.set_far_placement(Vector2(430.0, 120.0) + far_shift, 0.78, 0.86)
+		# Register the live fire directly to the terrace in the unified plate,
+		# using exactly the background shader's camera mapping.
+		var relative:Vector2=Vector2(camera_x,float(level.camera_y))-level.log_bridge.ORIGIN
+		var fire_ground:Vector2=DESTINATION_FIRE_UV*SCREEN-Vector2(relative.x*0.015,relative.y*0.10+30.0)
+		surface_art.set_far_placement(fire_ground-Vector2(1017,378)*0.78,0.78,1.0)
 		surface_art.sync(delta, 0.0, 0.0, true, 0.0)
+		surface_art.gameplay_sprite.show()
+		surface_art.tree_sprite.show()
+		surface_art.tree_sprite.position=Vector2(1132,378)-DESTINATION_TREE_ROOT*DESTINATION_TREE_SCALE
+		# Keep the live particles; discard the sharp baked campfire/stone decal.
+		surface_art.fire_sprite.hide()
+		surface_art.fire_flame.position.y+=17.0
+		surface_art.fire_flame.glow_scale=0.65
+		surface_art.fire_flame.monochrome=true
+		surface_art.fire_mist.hide()
+		# The common viewport now contains the opaque mountain behind the
+		# particles, so the original additive flame renders correctly.
+		(surface_art.fire_flame.material as CanvasItemMaterial).blend_mode=CanvasItemMaterial.BLEND_MODE_ADD
+	landmark_layer.visible=surface_layer.visible and active
+	landmark_output.visible=surface_layer.visible
+	landmark_view.render_target_update_mode=SubViewport.UPDATE_ALWAYS if landmark_layer.visible and landmark_output.visible else SubViewport.UPDATE_DISABLED
+	if landmark_layer.visible:
+		landmark_output.material.set_shader_parameter("exposure",1.0)
 	water_volume.visible = camera_x < 2750.0
 	background.position.x = -90.0 - maxf(camera_x, 0.0) * 0.10
 	cone.position = Vector2(370.0 - camera_x * 0.22, -155)
@@ -735,24 +1130,51 @@ func sync(delta: float, new_camera: float, active: bool) -> void:
 		if water_impacts[i].age > 2.4:
 			water_impacts.remove_at(i)
 	_update_ground_dust(delta)
-	dust_layer.queue_redraw()
-	mid.queue_redraw()
-	foreground.queue_redraw()
-	if first_act_world_animated:
+	if redraw:
+		dust_layer.queue_redraw()
+		mid.queue_redraw()
+		foreground.queue_redraw()
+	near_blur_sprite.visible = in_forest
+	# The existing world-space ground cover survives backdrop changes. It
+	# leaves the view by scrolling above the camera, never by a scene flag.
+	var show_ground:bool = camera_x < -2400.0 and float(level.camera_y)<-4250.0 and not (level.descent != null and level.descent.enabled)
+	grass_art.visible = show_ground
+	grass_band.visible = show_ground
+	var below_cliff := 0.0
+	if gorge_mix>0.0:
+		below_cliff = emergence
+	elif level.descent != null and level.descent.enabled:
+		below_cliff = (1.0-smoothstep(-1500.0,-250.0,camera_x))*smoothstep(0.0,2.5,float(level.descent.entry_time))
+	fore_blur_sprite.modulate.a = 1.0-below_cliff
+	weather_art.modulate.a = 1.0-below_cliff
+	near_view.render_target_update_mode = SubViewport.UPDATE_ALWAYS if in_forest else SubViewport.UPDATE_DISABLED
+	if in_forest:
+		plates_near.sync(camera_x, Scene1Ref.GROUND_Y - float(level.camera_y), (Scene1Ref.START_X + 3300.0) * 1.45)
+	# Ground cover is static world geometry, prepared across the whole forest.
+	# Move retained drawing commands with the camera instead of regenerating
+	# only the current screen (and repeatedly sampling/randomising each tuft).
+	var grass_origin := -Vector2(camera_x, float(level.camera_y))
+	grass_art.position = grass_origin
+	grass_band.position = grass_origin
+	var grass_edge := Scene1Ref.edge_x()
+	if show_ground and grass_edge != _grass_cached_edge:
+		_grass_cached_edge = grass_edge
+		_prepare_grass_edges()
+		grass_art.queue_redraw()
+		grass_band.queue_redraw()
+	if first_act_world_animated and redraw:
 		for plane in [terrain, props, crate_art, raft_front, bank_grass, surface]:
 			plane.queue_redraw()
 
 func _draw_mid() -> void:
+	if camera_x < -2400.0:
+		return  # scene 1 has its own terrain-bounded forest plates
 	# These sparse trees move independently of the distant bitmap and playable bank.
 	var specs: Array = [Vector3(110, 95, 0.27), Vector3(1180, 74, 0.24), Vector3(1710, 56, 0.25), Vector3(1960, 108, 0.29), Vector3(2230, 120, 0.32), Vector3(2640, 70, 0.26)]
-	if camera_x > 6200.0:
-		# the forest above the lift: a stand of trunks that slide slower than the camera
-		var forest_rng := RandomNumberGenerator.new()
-		forest_rng.seed = 4242
-		for i in range(26):
-			specs.append(Vector3(2000.0 + float(i) * 150.0 + forest_rng.randf_range(-40.0, 40.0), forest_rng.randf_range(40.0, 120.0), forest_rng.randf_range(0.20, 0.34)))
-	if camera_x < -200.0:
-		# scenes 1 to 6: a stand of trunks that slide slower than the camera, without end (each one is fixed by its index)
+	# Preserve the sparse lift approach: do not overlay an extra stand of trees
+	# when the camera reaches the lift. The panorama and existing trees continue.
+	if camera_x < -200.0 and camera_x >= -2400.0:
+		# (scene 1, west of here, has its own trunks in the misty forest shader) scenes 2 to 6: a stand of trunks that slide slower than the camera, without end (each one is fixed by its index)
 		var first := int(floor(camera_x * 0.29 / 92.0)) - 1
 		for i in range(first, first + 18):
 			var west_rng := RandomNumberGenerator.new()
@@ -1005,46 +1427,197 @@ func _draw_struggle_splash(impact: Dictionary) -> void:
 		surface.draw_line(point, point-tail, Color(shade,shade,shade,alpha), drop.radius*1.5, true)
 		surface.draw_circle(point, drop.radius, Color(shade,shade,shade,alpha), true, -1.0, true)
 
-# Scenes 1 to 6, the nearest layer: tall dark grass and fern fronds along the bottom edge and a few thin drooping branches along the
-# top edge (blurred by this layer): the feeling of being inside the forest, without anything in the way. Finite sets (the last one
-# comes in from the right edge as the backdrop opens) so nothing pops.
-func _draw_forest_frame() -> void:
-	if camera_x > -2000.0:
+# scene 1: the ground's edge is grown over with real grass (slices of a generated grass strip, placed along the contour, out of the way
+# of the pits and the cliff); a slice is about 50 px wide, each a different part of the strip, some turned round, some taller
+var _log_ranges: Array = []
+func _on_log(x: float) -> bool:
+	if _log_ranges.is_empty():
+		for f: Dictionary in Scene1Ref.FEATURES:
+			if String(f["t"]) == "log":
+				_log_ranges.append(Vector2(Scene1Ref.fx(f) - 30.0, Scene1Ref.fx(f) + float(f["len"]) + 20.0))
+	for range_value: Vector2 in _log_ranges:
+		if x > range_value.x and x < range_value.y:
+			return true
+	return false
+
+# Where the grass may grow (the same rule for the band and the tufts)
+func _forest_grass_surface(x:float)->float:
+	return Scene1Ref.ground_top(x)
+
+func _shelter_growth(x:float)->float:
+	return smoothstep(Scene1Ref.Crevice.LEFT-190.0,Scene1Ref.Crevice.LEFT+20.0,x)*(1.0-smoothstep(Scene1Ref.Crevice.EXIT_MOUTH,Scene1Ref.Crevice.RIGHT+160.0,x))
+
+func _grass_ok(x: float) -> bool:
+	# This depression is dry soil. The old below-baseline test only excluded
+	# water; it must not exclude the newly shaped shelter terrain as well.
+	var dry_hollow:=x>Scene1Ref.Crevice.ART_LEFT-130 and x<Scene1Ref.Crevice.ART_RIGHT+230
+	return not (x < Scene1Ref.WORLD_LEFT or x > Scene1Ref.edge_x() - 22.0 or Scene1Ref.in_pit(x) or (not dry_hollow and Scene1Ref.ground_top(x) > Scene1Ref.GROUND_Y + 6.0) or _on_log(x))
+
+# The ground's edge, drawn a few px thicker and ragged (solid ink, so the same black as the ground): the tufts are cut out of an image and
+# fade at their sides, so on their own they leave dips and ends between them; the blades stand in this mat instead, and the line of the
+# ground is never bare or cut off. It thins to nothing where the grass stops (pits, ponds, the log, the cliff).
+# One cached 1D distance field fades rooted grass into every shore/cut edge.
+func _prepare_grass_edges()->void:
+	_grass_weight_origin=Scene1Ref.WORLD_LEFT-24.0
+	var count:=int(ceil((Scene1Ref.edge_x()+24.0-_grass_weight_origin)/GRASS_WEIGHT_STEP))+1
+	var allowed:=PackedByteArray()
+	allowed.resize(count)
+	_grass_edge_weights.resize(count)
+	var distance:=1000.0
+	for i in count:
+		allowed[i]=1 if _grass_ok(_grass_weight_origin+i*GRASS_WEIGHT_STEP) else 0
+		distance=distance+GRASS_WEIGHT_STEP if allowed[i]==1 else 0.0
+		_grass_edge_weights[i]=distance
+	distance=1000.0
+	for i in range(count-1,-1,-1):
+		distance=distance+GRASS_WEIGHT_STEP if allowed[i]==1 else 0.0
+		_grass_edge_weights[i]=smoothstep(0.0,24.0,minf(distance,_grass_edge_weights[i]))
+
+func _grass_edge_weight(x:float)->float:
+	if _grass_edge_weights.is_empty():_prepare_grass_edges()
+	var at:=clampf((x-_grass_weight_origin)/GRASS_WEIGHT_STEP,0,_grass_edge_weights.size()-1.001)
+	var i:=int(at)
+	return lerpf(_grass_edge_weights[i],_grass_edge_weights[i+1],at-i)
+
+func _draw_grass_band() -> void:
+	var step := 6.0
+	var first := floorf(Scene1Ref.WORLD_LEFT / step) * step - step * 2.0
+	var count := int((Scene1Ref.CLIFF_X + step * 4.0 - first) / step) + 1
+	var margin := 5  # samples either side, for the thinning at the ends of a run
+	# which of the samples (world-aligned, every 6 px) the grass may grow at: asked once each
+	var ok := PackedByteArray()
+	ok.resize(count + margin * 2)
+	for k in count + margin * 2:
+		ok[k] = 1 if _grass_ok(first + float(k - margin) * step) else 0
+	var top := PackedVector2Array()
+	var bottom := PackedVector2Array()
+	var ink := Color(0.012, 0.013, 0.013, 1.0)
+	var run_open := false
+	for k in count:
+		var wx := first + float(k) * step
+		var at := k + margin
+		# thickness: ragged (two sines), and thinning over 30 px towards either end of a run (look 30 px ahead and behind)
+		var edge := 1.0 if (ok[at - 5] == 1 and ok[at + 5] == 1) else 0.0
+		var near_end := 1.0 if (ok[at - 3] == 1 and ok[at + 3] == 1) else 0.45
+		var thick := (5.5 + 2.4 * sin(wx * 0.37) + 1.4 * sin(wx * 0.91 + 1.3)) * (0.35 + 0.65 * edge) * near_end
+		if ok[at] == 1:
+			var gy: float = _forest_grass_surface(wx)
+			var weight:=_grass_edge_weight(wx)
+			top.append(Vector2(wx, gy - maxf(thick*weight,0.2)))
+			bottom.append(Vector2(wx, gy + lerpf(0.5,3.0,weight)))
+			run_open = true
+		elif run_open:
+			_flush_band(top, bottom, ink)
+			top = PackedVector2Array()
+			bottom = PackedVector2Array()
+			run_open = false
+	if run_open:
+		_flush_band(top, bottom, ink)
+	_draw_shelter_flowers()
+
+# Retained world-space details share the ground-cover cache. Roots are buried
+# in the same actual slope; flowers have no glow, collision or camera redraw.
+func _draw_shelter_flowers()->void:
+	var rng:=RandomNumberGenerator.new();rng.seed=411978
+	var ink:=Color(.012,.013,.013,1)
+	var from_x:float=Scene1Ref.Crevice.LEFT-130.0
+	var to_x:float=Scene1Ref.Crevice.EXIT_MOUTH+40.0
+	var x:=from_x
+	while x<to_x:
+		x+=rng.randf_range(48,87)
+		for stem in rng.randi_range(1,2):
+			var px:=x+rng.randf_range(-12,12)
+			if not _grass_ok(px) or _grass_edge_weight(px)<.85:continue
+			var gy:=_forest_grass_surface(px)+1.5
+			var height:=rng.randf_range(29,47)
+			if Scene1Ref.Crevice.inside(px):height=minf(height,gy-Scene1Ref.Crevice.ceiling(px,Callable())-6)
+			if height<24:continue
+			var lean:=rng.randf_range(-8,8)
+			grass_band.draw_set_transform(Vector2(px,gy),0,Vector2.ONE)
+			var tip:=Vector2(lean,-height)
+			var middle:=Vector2(lean*.35,-height*.53)
+			grass_band.draw_polyline(PackedVector2Array([Vector2.ZERO,middle,tip]),ink,.8,true)
+			var side:float=-1 if rng.randf()<.5 else 1
+			grass_band.draw_colored_polygon(PackedVector2Array([middle+Vector2(0,3),middle+Vector2(side*6,-2),middle+Vector2(side*2,2)]),ink)
+			var radius:=rng.randf_range(.9,1.25)
+			var turn:=rng.randf_range(0,TAU)
+			for petal in 5:
+				var angle:=turn+petal*TAU/5
+				grass_band.draw_circle(tip+Vector2.from_angle(angle)*radius,radius,ink,true,-1,true)
+			grass_band.draw_circle(tip,radius,ink,true,-1,true)
+	grass_band.draw_set_transform(Vector2.ZERO,0,Vector2.ONE)
+
+func _flush_band(top: PackedVector2Array, bottom: PackedVector2Array, ink: Color) -> void:
+	if top.size() < 2:
 		return
-	var fade := 1.0 - _emergence()
-	if fade <= 0.01:
-		return
-	var ink := Color(0.012, 0.014, 0.014, 0.92 * fade)
-	var first := int(floor(camera_x * 1.25 / 38.0)) - 2
-	for i in range(first, first + 40):
-		var r := RandomNumberGenerator.new()
-		r.seed = i * 4099 + 7
-		var wx := float(i) * 38.0 + r.randf_range(0.0, 30.0)
-		if wx > 1400.0 - 6000.0 * 1.25 or r.randf() < 0.38:
-			continue
-		var sx := wx - camera_x * 1.25
-		for blade in range(r.randi_range(2, 4)):
-			var h := r.randf_range(34.0, 118.0)
-			var lean := r.randf_range(-36.0, 36.0)
-			var bx := sx + float(blade) * r.randf_range(4.0, 9.0)
-			foreground.draw_colored_polygon(PackedVector2Array([Vector2(bx - 4.0, 744), Vector2(bx - 2.0 + lean * 0.3, 744.0 - h * 0.55), Vector2(bx + lean, 744.0 - h), Vector2(bx + 2.5 + lean * 0.3, 744.0 - h * 0.55), Vector2(bx + 4.0, 744)]), ink)
-	var top_first := int(floor(camera_x * 1.12 / 420.0)) - 1
-	for i in range(top_first, top_first + 5):
-		var r2 := RandomNumberGenerator.new()
-		r2.seed = i * 7121 + 3
-		var wx2 := float(i) * 420.0 + r2.randf_range(0.0, 300.0)
-		if wx2 > 1400.0 - 6000.0 * 1.12 or r2.randf() < 0.3:
-			continue
-		var tx := wx2 - camera_x * 1.12
-		var length := r2.randf_range(70.0, 190.0)
-		var sway := r2.randf_range(-50.0, 50.0)
-		var pts := PackedVector2Array([Vector2(tx - 3.0, -20), Vector2(tx + sway * 0.4, length * 0.5), Vector2(tx + sway, length), Vector2(tx + sway * 0.4 + 3.0, length * 0.5), Vector2(tx + 3.0, -20)])
-		foreground.draw_colored_polygon(pts, ink)
-		var fork := Vector2(tx + sway * 0.4, length * 0.5)
-		foreground.draw_colored_polygon(PackedVector2Array([fork + Vector2(-2, 0), fork + Vector2(r2.randf_range(-60.0, 60.0), length * 0.35), fork + Vector2(2, 0)]), ink)
+	var points := PackedVector2Array(top)
+	for i in range(bottom.size() - 1, -1, -1):
+		points.append(bottom[i])
+	grass_band.draw_colored_polygon(points, ink)
+
+# Each tuft follows the actual surface across its full width. Only a tiny
+# buried root margin is sampled; the source strip's rectangular soil is omitted.
+# Valid runs stop at pits/water/logs rather than testing only the tuft centre.
+func _draw_ground_grass() -> void:
+	var step:=18.0
+	var first:=floorf(Scene1Ref.WORLD_LEFT/step)*step-step
+	var wx:=first
+	var slice_src:=1280.0/11.0
+	while wx<Scene1Ref.CLIFF_X+step:
+		var snap:=int(floorf(wx/step))
+		var here:=wx+step*0.5
+		wx+=step
+		if not _grass_ok(here):continue
+		var rng:=RandomNumberGenerator.new()
+		rng.seed=snap*2713+5
+		var index:=rng.randi()%11
+		var tall:=rng.randf_range(0.7,1.35)
+		var bramble_x:float=Scene1Ref.START_X+Scene1Ref.BRAMBLE_OFFSET
+		var thorn_clear:=1.0-smoothstep(46.0,105.0,absf(here-(bramble_x+42)))
+		tall*=lerpf(1.0,.30,thorn_clear)
+		tall*=lerpf(1.0,1.14,_shelter_growth(here))
+		var width:=step*2.6
+		var blades:=maxf(3.0,143.0*(width/slice_src)*tall-10.0)
+		var root_depth:=2.0
+		var mirrored:=rng.randf()<0.5
+		var gy:=_forest_grass_surface(here)
+		grass_art.draw_set_transform(Vector2(here,gy),0,Vector2.ONE)
+		var columns:=int(ceil(width/2.0))
+		var run_start:=-1
+		for column in columns:
+			var left:=here-width*0.5+width*float(column)/columns
+			var right:=here-width*0.5+width*float(column+1)/columns
+			var allowed:=_grass_ok(left+0.01) and _grass_ok((left+right)*0.5) and _grass_ok(right-0.01)
+			if allowed and run_start<0:run_start=column
+			if not allowed and run_start>=0:
+				_grass_surface_run(here,gy,width,blades,root_depth,index,slice_src,mirrored,columns,run_start,column)
+				run_start=-1
+		if run_start>=0:_grass_surface_run(here,gy,width,blades,root_depth,index,slice_src,mirrored,columns,run_start,columns)
+	grass_art.draw_set_transform(Vector2.ZERO,0,Vector2.ONE)
+
+func _grass_surface_run(here:float,gy:float,width:float,blades:float,root_depth:float,index:int,slice_src:float,mirrored:bool,columns:int,first:int,last:int)->void:
+	var points:=PackedVector2Array()
+	var uv:=PackedVector2Array()
+	var colors:=PackedColorArray()
+	for column in range(first,last+1):
+		var t:=float(column)/columns
+		var x:float=-width*0.5+width*t
+		var weight:=_grass_edge_weight(here+x)
+		points.append(Vector2(x,_forest_grass_surface(here+x)-gy-blades*lerpf(0.12,1.0,weight)))
+		colors.append(Color(1,1,1,sqrt(weight)))
+		var u:float=(float(index)*slice_src+2.0+(1.0-t if mirrored else t)*(slice_src-4.0))/1280.0
+		uv.append(Vector2(u,419.0/720.0))
+	for column in range(last,first-1,-1):
+		var t:=float(column)/columns
+		var x:float=-width*0.5+width*t
+		var weight:=_grass_edge_weight(here+x)
+		points.append(Vector2(x,_forest_grass_surface(here+x)-gy+root_depth))
+		colors.append(Color(1,1,1,sqrt(weight)))
+		var u:float=(float(index)*slice_src+2.0+(1.0-t if mirrored else t)*(slice_src-4.0))/1280.0
+		uv.append(Vector2(u,568.0/720.0))
+	if points.size()>=4:grass_art.draw_polygon(points,colors,uv,GRASS_STRIP)
 
 func _draw_foreground() -> void:
-	_draw_forest_frame()
 	var x := -70.0 - camera_x*1.10
 	if x > -260.0:
 		foreground.draw_colored_polygon(PackedVector2Array([Vector2(x-40,-30),Vector2(x+116,-30),Vector2(x+96,150),Vector2(x+55,345),Vector2(x+35,540),Vector2(x-25,590)]),Color("090a0a"))
@@ -1071,16 +1644,24 @@ func _draw_foreground() -> void:
 		if sx < -60.0 or sx > 1340.0:
 			continue
 		foreground.draw_colored_polygon(PackedVector2Array([Vector2(sx-width,744),Vector2(sx+lean,744-height),Vector2(sx+width,744)]),Color(0.012,0.014,0.014,0.85))
-	if camera_x > 6200.0:
-		# the forest above the lift: a few near trunks go past faster than the camera and frame the picture
-		for spec in [Vector3(8700.0, 52.0, 0.0), Vector3(9560.0, 44.0, 1.0), Vector3(10520.0, 56.0, 2.0), Vector3(11500.0, 46.0, 3.0), Vector3(12500.0, 54.0, 4.0)]:
-			var tx: float = spec.x - camera_x * 1.14
-			if tx < -200.0 or tx > 1480.0:
-				continue
-			var tw: float = spec.y
-			var lean: float = sin(spec.z * 2.3) * 14.0
-			foreground.draw_colored_polygon(PackedVector2Array([Vector2(tx - tw * 0.5, -30), Vector2(tx + tw * 0.5, -30), Vector2(tx + tw * 0.62 + lean, 330), Vector2(tx + tw * 0.9, 744), Vector2(tx - tw * 0.9, 744), Vector2(tx - tw * 0.6 + lean, 330)]), Color("090a0a"))
+	# Near trunks use the same fixed placement, with only offscreen culling.
+	for spec in [Vector3(8700.0, 52.0, 0.0), Vector3(9560.0, 44.0, 1.0), Vector3(10520.0, 56.0, 2.0), Vector3(11500.0, 46.0, 3.0), Vector3(12500.0, 54.0, 4.0)]:
+		var tx: float = spec.x - camera_x * 1.14
+		if tx < -200.0 or tx > 1480.0:
+			continue
+		var tw: float = spec.y
+		var lean: float = sin(spec.z * 2.3) * 14.0
+		foreground.draw_colored_polygon(PackedVector2Array([Vector2(tx - tw * 0.5, -30), Vector2(tx + tw * 0.5, -30), Vector2(tx + tw * 0.62 + lean, 330), Vector2(tx + tw * 0.9, 744), Vector2(tx - tw * 0.9, 744), Vector2(tx - tw * 0.6 + lean, 330)]), Color("090a0a"))
 	for i in range(12):
 		var age := fposmod(clock*0.019+i*0.117,1.0)
 		var mote := Vector2(fposmod(i*137.0-camera_x*0.40+age*30.0,1280.0),580-age*420.0)
 		foreground.draw_circle(mote,0.7,Color(0.88,0.88,0.88,sin(age*PI)*0.13),true,-1,true)
+
+# Reject the entire projected root footprint once, so a foreground tree never
+# sweeps across the pond/pit and is never culled into view mid-walk.
+func _near_tree_land_range(left:float,right:float)->bool:
+	var x:=left
+	while x<=right:
+		if Scene1Ref.in_pit(x) or Scene1Ref.ground_top(x)>Scene1Ref.GROUND_Y+1.0 or x>Scene1Ref.Crevice.LEFT-160 or absf(x-(Scene1Ref.START_X+Scene1Ref.BRAMBLE_OFFSET+42))<135:return false
+		x+=12.0
+	return true

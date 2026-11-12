@@ -4,6 +4,22 @@
 
 ## 命名规则
 
+### 当前已实现的过桥后续段（优先于下方早期 40 场景草案）
+
+完整入口：`scenes/chapters/chapter_01_route.tscn`。森林、绳梯和斜桥后直接进入两段新玩法，原 C 区保留；旧“场景 2～6 美术巡览”仅作构图参考，不作为游戏通路。
+
+**双路吊运站**：共同观察区分出两条独立可通关路线。上路先移动滑车，使悬台同时处于前后两次跳跃的范围，再站在倾板左侧承重、按 F 将棘爪锁进承点，利用升起的远端够到高处出口。下路通过配重滑车把吊篮带回登乘高度；登篮持续握住制动柄下降，卡轨后停在左侧检修台拔出承压木条，再继续下降并跳向共同出口。检修台放在吊篮后方，避免斜降时把乘客挤入台底。任一路都不以解完另一条路为前提。
+
+**落石栈道／崖脚洞口**：先在安全宽台看清落石周期，调节导石板，把危险转成吊篮中的配重。每一块实际接住的石头降低悬台一段，两块后形成通路，已完成状态保留。后段有 36 段逐跳验证的折返通路，混合延迟断裂的朽木、真实移动的吊板和固定岩窝。常规下降落差为 95 px，给当前跳跃高度与 170 px 致死落差留出余量。高处观察台为可选支线，发现前人遗迹不影响主线解锁。最后从高于 C 区左岸的洞口踏出，镜头随坡度逐渐回到原 C 区构图。
+
+检查点：保留滑车、锁止、卡轨、导石配重等已知世界状态；危险落石和朽木恢复，避免试错后软锁。整段重置则恢复所有机关。操作仍为 A/D、空格、F；绳梯继续使用 W/S，不加入新角色比例或新跳跃能力。
+
+设计参考采用原创机关组合，未复制具体关卡：Playdead [LIMBO: Balancing Fun and Frustration](https://blog.playdead.com/articles/limbo_presentations/limbo_publications.html) 的可理解反馈与难度取舍；[Celeste 关卡设计分享](https://www.gdcvault.com/play/1024307/Level-Design-Workshop-Designing-Celeste) 的段落组织；[INSIDE: The Weight of Detail](https://blog.playdead.com/articles/the_weight_of_detail/weight_of_detail.html) 对稀疏画面中细节反馈的重视。文档只据公开简介提取设计方向，不声称完整观看或复刻演讲内容。
+
+实现：`scripts/chapters/descent_route_act.gd`、`descent_route_layout.gd`、`descent_route_art.gd`。图像：`assets/art/descent/post-bridge/silhouette-kit-v1.png`，imagegen 生成的独立透明剪影，岩台、木梁、吊篮分开使用，交互碰撞与角色不烘焙进背景。远景、结构中景、玩法剪影和近景独立分层，切换依据实际位置而非关卡模式。
+
+验证入口：`descent_route_smoke.gd`、`descent_jumps_smoke.gd`、`chapter_01_route_smoke.gd`、`descent_route_capture.gd`，均位于 `scripts/demos/c_zone_debug/`。测试使用真实角色碰撞和 Space/F/A/D 操作；跳跃测试覆盖短跳的空中制动、移动平台、支线和 C 区入口。
+
 - 统一叫 **场景 N · 名字**，名字要带一句标志性描述。不再用"区域""记忆点""关""竖井"。
 - 玩家看到的是**一整条连续的地图**，没有关卡名、结算、读条、渐黑；场景编号只是内部排期和设计用的分段。
 - 7 个大段（"部"）把场景按主题归类，也是地图上的地貌分区。

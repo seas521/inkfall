@@ -223,7 +223,7 @@ func _build_ui() -> void:
 	mode_auto.button_group = group
 	mode_auto.pressed.connect(func(): set_auto_mode(true))
 	modes.add_child(mode_auto)
-	mode_manual = _button("MANUAL", "A/D or arrows: walk. Shift: run. Space/W: jump.")
+	mode_manual = _button("MANUAL", "A/D or arrows: walk. Shift: run. Space: jump.")
 	mode_manual.toggle_mode = true
 	mode_manual.button_group = group
 	mode_manual.pressed.connect(func(): set_auto_mode(false))
@@ -357,7 +357,7 @@ func _unhandled_key_input(event: InputEvent) -> void:
 			reset_demo()
 		KEY_P:
 			_toggle_pause()
-		KEY_SPACE, KEY_W:
+		KEY_SPACE:
 			if auto_mode:
 				set_auto_mode(false)
 			pending_jump = true
