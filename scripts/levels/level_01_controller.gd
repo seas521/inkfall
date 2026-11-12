@@ -336,12 +336,11 @@ func restart_current() -> void:
 
 func physics_tick(delta: float) -> void:
 	elapsed += delta
-	var hood_speed := ActorStyleHost.style_override == ActorPoseState.STYLE_HOOD
-	game_context.run_speed_scale = ActorPoseState.HOOD_RUN_SPEED_SCALE if hood_speed else 1.0
-	game_context.ground_accel = ActorPoseState.HOOD_START_ACCEL if hood_speed else 2300.0
-	game_context.air_speed_scale = ActorPoseState.HOOD_AIR_SPEED_SCALE if hood_speed else 1.0
-	game_context.jump_speed_scale = ActorPoseState.HOOD_JUMP_SCALE if hood_speed else 1.0
-	game_context.jump_windup_total = ActorPoseState.HOOD_JUMP_WINDUP if hood_speed else 0.0
+	game_context.run_speed_scale = ActorPoseState.HOOD_RUN_SPEED_SCALE
+	game_context.ground_accel = ActorPoseState.HOOD_START_ACCEL
+	game_context.air_speed_scale = ActorPoseState.HOOD_AIR_SPEED_SCALE
+	game_context.jump_speed_scale = ActorPoseState.HOOD_JUMP_SCALE
+	game_context.jump_windup_total = ActorPoseState.HOOD_JUMP_WINDUP
 	_update_curtain(delta)
 	_advance_actor_action(delta)
 	room_intro_time = maxf(0.0, room_intro_time - delta)
@@ -411,7 +410,7 @@ func presentation_state() -> Dictionary:
 		or actor_action == ActorPoseState.ACTION_THROW_RELEASE
 	)
 	return {
-		"style_id": ActorPoseState.STYLE_CROOKED_TOWER,
+		"style_id": ActorPoseState.STYLE_HOOD,
 		"feet": _world_to_screen(player_position + Vector2(13.0, 54.0)) + visual_grounding_offset,
 		"velocity": player_velocity, "grounded": on_ground, "facing": player_facing,
 		"held": held_item_index, "aiming": throw_preparing, "room": int(room),
@@ -425,7 +424,7 @@ func presentation_state() -> Dictionary:
 		"light_exposure": 0.38 if room == Room.SURFACE else 0.18,
 		"small_item_kind": item_kind,
 		"small_item_radius": item_radius,
-		"visual_scale": 0.78 if room == Room.SURFACE else 1.0,
+		"visual_scale": ActorPoseState.HOOD_VISUAL_SCALE,
 		"fog_blur": _surface_actor_fog_blur() if room == Room.SURFACE else 0.0,
 		"monochrome": room == Room.CAVERN or room == Room.LEVEL_01_LIFT,
 		"clip_flip_h": _shaft_entry_clip_flip(),
@@ -493,8 +492,8 @@ func _advance_actor_action(delta: float) -> void:
 		and shaft_entry_phase == ShaftEntryPhase.GET_UP
 	):
 		shaft_entry_phase = ShaftEntryPhase.DONE
-		# He stands up facing the way he fell (the hooded boy stands facing right, where the shaft goes on).
-		player_facing = 1.0 if ActorStyleHost.style_override == ActorPoseState.STYLE_HOOD else -1.0
+		# He stands up facing right, where the shaft goes on.
+		player_facing = 1.0
 		checkpoint_position = Vector2(500.0, 566.0)
 		shaft_checkpoint_depth = 620.0
 		_set_actor_action(ActorPoseState.ACTION_NONE)
@@ -550,9 +549,6 @@ func _draw() -> void:
 	if room == Room.CAVERN and cavern_failure_kind != "": _draw_cavern_failure_effect()
 	if room == Room.CAVERN and spout_reject_time > 0.0: _draw_spout_reject_effect()
 	draw_ui()
-	# the hooded boy's failures use the iris instead of the grey flash
-	if failure_flash > 0.0 and ActorStyleHost.style_override != ActorPoseState.STYLE_HOOD:
-		draw_rect(Rect2(Vector2.ZERO, SCREEN), Color(INK, failure_flash * 0.7))
 	_sync_iris()
 
 func draw_world() -> void:
@@ -871,8 +867,6 @@ func _sync_iris() -> void:
 	iris.call("set_state", _curtain_alpha() if curtain_phase != 0 else 0.0, centre)
 
 func _begin_curtain() -> bool:
-	if ActorStyleHost.style_override != ActorPoseState.STYLE_HOOD:
-		return false
 	if curtain_phase == 0:
 		curtain_phase = 1
 		curtain_time = 0.0
@@ -1469,7 +1463,7 @@ func _shaft_shake_y() -> float:
 
 # The hooded boy lands as a small figure: a few small puffs off the pile, not big grey clouds around him.
 func _dust_scale() -> float:
-	return 0.3 if ActorStyleHost.style_override == ActorPoseState.STYLE_HOOD else 1.0
+	return 0.3
 
 func _spawn_shaft_impact_dust(at: Vector2, power: float) -> void:
 	power *= _dust_scale()

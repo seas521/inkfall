@@ -12,6 +12,8 @@ const FOREGROUND_RICH_TOP := -98.0
 const FAR_VALLEY: Texture2D = preload("res://assets/art/level01/cinematic_surface/far-vista-v3.jpg")
 const MID_RUINS: Texture2D = preload("res://assets/art/level01/cinematic_surface/mid-forest-ruins-v2-magenta.png")
 const GAMEPLAY_PLATE: Texture2D = preload("res://assets/art/level01/cinematic_surface/gameplay-cliffs-house-v2-magenta.png")
+# Scene 1's cliff edge (far mode) looks out over this: a soft grey gorge of out-of-focus rock spires under a moon halo (grayscale, no hard edges)
+const FAR_VALLEY_MISTY: Texture2D = preload("res://assets/art/c_zone_debug/forest/valley_misty.jpg")
 const YARD_TREE: Texture2D = preload("res://assets/art/level01/cinematic_surface/yard-tree-black.png")
 const InkFlame = preload("res://scripts/effects/ink_flame.gd")
 const FOREGROUND_LEFT_TREE: Texture2D = preload("res://assets/art/level01/cinematic_surface/foreground-left-tree.png")
@@ -23,6 +25,14 @@ const FIRELIGHT_SHADER: Shader = preload("res://assets/shaders/level01_firelight
 var clock := 0.0
 var player_x := 170.0
 var right_shift_x := 0.0
+var world_offset := Vector2.ZERO  # moves the cliffs, the house, the tree and the fire (not the sky) when this art is placed in a scrolling world
+var show_left_foreground := true
+# far mode: only the right cliff with the house, the yard tree and the fire is kept, as a distant cliff in the haze (placed by
+# set_far_placement); the left cliff, the grass and the foreground frames are not drawn
+var far_mode := false
+var far_group: Node2D
+var far_mist: Node2D
+var gameplay_region_offset := Vector2.ZERO
 var fire_intensity := 0.86
 var bat_gust := 0.0
 
@@ -45,12 +55,13 @@ var soft_texture: GradientTexture2D
 var tree_material: ShaderMaterial
 var fire_material: ShaderMaterial
 var fire_flame: Node2D
+var fire_mist: Node2D
 
 
 func _ready() -> void:
 	soft_texture = _make_soft_texture()
 
-	far_sprite = _make_sprite(FAR_VALLEY, 0)
+	far_sprite = _make_sprite(FAR_VALLEY_MISTY if far_mode else FAR_VALLEY, 0)
 	far_fog = _make_draw_layer(_draw_far_fog, 1)
 	mid_sprite = _make_sprite(MID_RUINS, 2)
 	# The old ruined-cliff plate doubles up with the vista's own rock layers, so it is not shown.
@@ -82,6 +93,36 @@ func _ready() -> void:
 
 	_configure_layout()
 	_configure_materials()
+	if far_mode:
+		far_group = Node2D.new()
+		add_child(far_group)
+		for part in [gameplay_sprite, tree_sprite, fire_sprite, fire_flame, fire_air]:
+			remove_child(part)
+			far_group.add_child(part)
+		gameplay_sprite.region_enabled = true
+		gameplay_sprite.region_rect = Rect2(880.0, 250.0, 792.0, 691.0)
+		gameplay_region_offset = Vector2(880.0, 250.0) * PLATE_SCALE
+		# the plate stops at its bottom edge: a bank of mist hides it and the cliff goes down into the haze
+		far_mist = Node2D.new()
+		far_mist.z_index = 20
+		far_mist.draw.connect(func() -> void:
+			var top := Color(0.20, 0.20, 0.20, 0.0)
+			var bottom := Color(0.20, 0.20, 0.20, 1.0)
+			far_mist.draw_polygon(PackedVector2Array([Vector2(640, 480), Vector2(1800, 480), Vector2(1800, 1000), Vector2(640, 1000)]), PackedColorArray([top, top, bottom, top])))
+		far_group.add_child(far_mist)
+		cliff_grass.visible = false
+		foreground_air.visible = false
+		foreground_right.visible = false
+		foreground_left_tree.visible = false
+		fire_light.visible = false
+		# The far bank is seen through the mountain mist like everything else out there: its cliffs and the house are soft grey
+		# silhouettes (blurred, not black), and the fire is wrapped in mist (a bright core, a soft halo, haze drifting across it).
+		gameplay_sprite.material = _make_haze_silhouette_material(5.5, 0.04, 0.34, 1.0)
+		fire_flame.glow_scale = 1.2
+		(far_sprite.material as ShaderMaterial).set_shader_parameter("lift", 0.20)
+		fire_mist = _make_draw_layer(_draw_fire_mist, 10)
+		remove_child(fire_mist)
+		far_group.add_child(fire_mist)
 
 
 func _make_sprite(texture_value: Texture2D, z_value: int, relative_z: bool = true) -> Sprite2D:
@@ -157,7 +198,7 @@ func _make_soft_texture() -> GradientTexture2D:
 func _configure_layout() -> void:
 	# The vista plate is 1280 x 720; a little oversize so the camera's small parallax never shows an edge.
 	far_sprite.position = Vector2(-32.0, -19.0)
-	far_sprite.scale = Vector2.ONE * 1.05
+	far_sprite.scale = Vector2.ONE * 1.05 * (1280.0 / far_sprite.texture.get_width())
 
 	mid_sprite.position = Vector2(-14.0, -8.0)
 	mid_sprite.scale = Vector2.ONE * 0.79
@@ -204,6 +245,7 @@ func _make_far_material() -> ShaderMaterial:
 	# rock layers stay readable, and a touch of haze at the bottom.
 	var shader := Shader.new()
 	shader.code = """shader_type canvas_item;
+uniform float lift = 0.07;  // the black of the picture
 void fragment() {
 	// The plate is slid down and right so the moon sits clear of the screen corner (where the film's
 	// vignette would sink it) and of the caption; the sprite mirrors past its edge, so nothing shows.
@@ -215,7 +257,7 @@ void fragment() {
 	c += texture(TEXTURE, uv + vec2(0.0, px.y)).rgb * 0.135;
 	c += texture(TEXTURE, uv - vec2(0.0, px.y)).rgb * 0.135;
 	float lum = dot(c, vec3(0.299, 0.587, 0.114));
-	float value = 0.07 + lum * 0.93;
+	float value = lift + lum * (1.0 - lift);
 	// The moon is near a corner, where the film's vignette would sink it: lift the very bright part.
 	value += smoothstep(0.88, 0.99, lum) * 0.16;
 	value = mix(value, 0.62, smoothstep(0.80, 1.0, UV.y) * 0.35);
@@ -260,6 +302,7 @@ uniform float spread = 2.5;
 uniform float low = 0.2;
 uniform float high = 0.6;
 uniform float layer_alpha = 1.0;
+uniform bool original_destination = false;
 void fragment() {
 	vec2 px = TEXTURE_PIXEL_SIZE * spread;
 	float lum_sum = 0.0;
@@ -280,6 +323,11 @@ void fragment() {
 	float a_out = alpha_sum / weights;
 	float lum = lum_sum / max(alpha_sum, 0.0001);
 	float value = mix(low, high, clamp(pow(lum, 0.8), 0.0, 1.0));
+	if(original_destination){
+		// Preserve the real window from the original cabin source.
+		value=mix(low,0.94,smoothstep(0.62,0.84,lum));
+		a_out*=1.0-smoothstep(0.460,0.475,UV.y);
+	}
 	COLOR = vec4(vec3(value), a_out * layer_alpha);
 }"""
 	var material_value := ShaderMaterial.new()
@@ -295,6 +343,7 @@ func _make_tree_material() -> ShaderMaterial:
 	var shader := Shader.new()
 	shader.code = """shader_type canvas_item;
 uniform float clock = 0.0;
+uniform float ink = 0.0;
 void fragment() {
 	float upper = 1.0 - smoothstep(0.16, 0.86, UV.y);
 	float crown = upper * upper;
@@ -306,7 +355,7 @@ void fragment() {
 	) * crown;
 	// The picture is already a black silhouette with a transparent background.
 	vec4 source = texture(TEXTURE, sample_uv);
-	COLOR = vec4(0.0, 0.0, 0.0, source.a);
+	COLOR = vec4(vec3(ink), source.a);
 }"""
 	var material_value := ShaderMaterial.new()
 	material_value.shader = shader
@@ -403,25 +452,45 @@ func sync(
 	mid_fog.position = Vector2(0.0, -camera_y * 0.46)
 	moon_light.position = Vector2(-70.0, 34.0 - camera_y * 0.16)
 	valley_light.position = Vector2(250.0, 118.0 - camera_y * 0.32)
-	fire_light.position = Vector2(920.0, 274.0 - camera_y)
+	fire_light.position = Vector2(920.0 + world_offset.x, 274.0 - camera_y + world_offset.y)
 
-	gameplay_sprite.position = Vector2(0.0, 65.0 - camera_y)
-	tree_sprite.position.y = 378.0 - 826.0 * 0.245 - camera_y
-	fire_sprite.position.y = 378.0 - 714.0 * 0.18 - camera_y
-	fire_flame.position = Vector2(1017.0, 361.0 - camera_y)
-	fire_air.position = Vector2(0.0, -camera_y)
-	cliff_grass.position = Vector2(0.0, -camera_y)
+	gameplay_sprite.position = Vector2(world_offset.x, 65.0 - camera_y + world_offset.y) + gameplay_region_offset
+	tree_sprite.position = Vector2(1232.0 - 1015.0 * 0.245 + world_offset.x, 378.0 - 826.0 * 0.245 - camera_y + world_offset.y)
+	fire_sprite.position = Vector2(1017.0 - 838.0 * 0.18 + world_offset.x, 378.0 - 714.0 * 0.18 - camera_y + world_offset.y)
+	fire_flame.position = Vector2(1017.0 + world_offset.x, 361.0 - camera_y + world_offset.y)
+	fire_air.position = Vector2(world_offset.x, -camera_y + world_offset.y)
+	var redraw := _redraw_due()
+	if fire_mist != null:
+		fire_mist.position = fire_air.position
+		if redraw:
+			fire_mist.queue_redraw()
+	cliff_grass.position = Vector2(world_offset.x, -camera_y + world_offset.y)
+	foreground_left_tree.visible = show_left_foreground and not far_mode
 
 	foreground_right.position.y = FOREGROUND_TOP - camera_y * 1.04
 	foreground_left_tree.position.y = FOREGROUND_RICH_TOP - camera_y * 1.0
 	foreground_air.position = Vector2(0.0, -camera_y * 1.12)
 
-	far_fog.queue_redraw()
-	mid_fog.queue_redraw()
-	fire_air.queue_redraw()
-	cliff_grass.queue_redraw()
-	foreground_air.queue_redraw()
+	if redraw:
+		far_fog.queue_redraw()
+		mid_fog.queue_redraw()
+		fire_air.queue_redraw()
+		cliff_grass.queue_redraw()
+		# (far away behind the forest the dust and grain of the near air are not seen: 190 circles a frame for nothing)
+		if not far_mode:
+			foreground_air.queue_redraw()
 
+
+# Redraws are asked for from the physics step, and Godot draws at the end of every step: when a frame needs two or three steps
+# (it runs late, and a late frame is the one that needs the most), the same expensive drawing was done two or three times in that frame,
+# which made it later still. A node is asked to redraw once per rendered frame, whatever the number of steps in it.
+var _redraw_frame := -1
+func _redraw_due() -> bool:
+	var frame := Engine.get_process_frames()
+	if frame == _redraw_frame:
+		return false
+	_redraw_frame = frame
+	return true
 
 func _draw_soft(canvas: Node2D, center: Vector2, size: Vector2, tint: Color) -> void:
 	canvas.draw_texture_rect(soft_texture, Rect2(center - size * 0.5, size), false, tint)
@@ -465,6 +534,14 @@ func _draw_fire_air() -> void:
 	var pulse := fire_intensity
 	_draw_soft(fire_air, origin + Vector2(0.0, -30.0), Vector2(96.0, 72.0), Color(0.72, 0.72, 0.72, 0.030 * pulse))
 	_draw_soft(fire_air, origin + Vector2(0.0, -17.0), Vector2(60.0, 50.0), Color(0.86, 0.86, 0.86, 0.045 * pulse))
+
+
+func _draw_fire_mist() -> void:
+	var origin := Vector2(1017.0, 366.0)
+	var drift := sin(clock * 0.35) * 10.0
+	_draw_soft(fire_mist, origin + Vector2(drift, -8.0), Vector2(260.0, 150.0), Color(0.74, 0.74, 0.72, 0.20))
+	_draw_soft(fire_mist, origin + Vector2(-drift * 1.4, -26.0), Vector2(150.0, 100.0), Color(0.80, 0.80, 0.78, 0.16))
+	_draw_soft(fire_mist, origin + Vector2(drift * 0.6, 6.0), Vector2(340.0, 70.0), Color(0.70, 0.70, 0.68, 0.18))
 
 
 func _draw_cliff_grass() -> void:
@@ -522,3 +599,10 @@ func _draw_foreground_air() -> void:
 		var y := fposmod(float(grain_index * 137 + frame_seed * 53), SCREEN.y)
 		var value := 0.30 if (grain_index + frame_seed) % 4 == 0 else 0.0
 		foreground_air.draw_circle(Vector2(x, y), 0.45, Color(value, value, value, 0.007), true, -1.0, false)
+
+# Far mode: where the distant cliff stands on the screen and how big it is.
+func set_far_placement(at: Vector2, scale_value: float, haze: float) -> void:
+	if far_group != null:
+		far_group.position = at
+		far_group.scale = Vector2.ONE * scale_value
+		far_group.modulate = Color(1.0, 1.0, 1.0, haze)

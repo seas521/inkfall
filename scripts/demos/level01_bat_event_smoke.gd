@@ -12,6 +12,7 @@ func _initialize() -> void:
 
 func _run() -> void:
 	var main = MAIN_SCENE.instantiate()
+	main.debug_start_level = 1  # the project may be set to start in another act for play-testing
 	root.add_child(main)
 	await _frames(4)
 	var controller = main.active_controller
@@ -43,8 +44,8 @@ func _run() -> void:
 		"impact starts the approved knockdown clip"
 	)
 	_assert(
-		main.art_actor.crooked_tower_actor.current_clip == &"knockdown",
-		"Seedance knockdown frames are playing"
+		main.art_actor.hood_actor.current_clip in [&"fall_air", &"fall_impact"],
+		"knockdown frames are playing"
 	)
 
 	await _frames(90)
@@ -53,8 +54,8 @@ func _run() -> void:
 		"knockdown transitions to the downed hold"
 	)
 	_assert(
-		main.art_actor.crooked_tower_actor.current_clip == &"downed",
-		"Seedance downed loop is playing"
+		main.art_actor.hood_actor.current_clip == &"downed",
+		"downed loop is playing"
 	)
 
 	await _frames(80)
@@ -63,8 +64,8 @@ func _run() -> void:
 		"downed hold transitions to automatic get-up"
 	)
 	_assert(
-		main.art_actor.crooked_tower_actor.current_clip == &"get_up",
-		"Seedance get-up frames are playing"
+		main.art_actor.hood_actor.current_clip == &"get_up",
+		"get-up frames are playing"
 	)
 
 	await _frames(150)

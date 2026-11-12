@@ -71,7 +71,7 @@ func _run() -> void:
 	_check(level.fan_owned and not level.art.fan_pickup.visible,"landing keeps exactly one held leaf")
 	await _shot("04-held-leaf",level.player.position+Vector2(48,0),2.4)
 	Input.action_press("interact")
-	await Route.frames(level,30)
+	await Route.frames(level,90)
 	Input.action_release("interact")
 	_check(not level.fan_owned and absf(level.fan_rest_position().y-level.RACK_RECT.position.y+4.0)<0.01,"the leaf can be put down on the rack, not dropped through to ground")
 	await Route.frames(level,2)

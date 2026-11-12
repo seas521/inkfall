@@ -8,6 +8,10 @@ const FLOCK_EXIT_TIME := 2.05
 var clock := 0.0
 var sequence_time := 0.0
 var target := Vector2(390.0, 398.0)
+var start_shift := Vector2.ZERO  # moves where they come up from (scene 1: from over the chasm, not from under the ground)
+var start_spread := Vector2(164,112)
+var exit_shift := Vector2.ZERO  # and where they leave to
+var approach_arc := 0.0  # px: the way in bows upward (scene 1: they climb out of the chasm in the open air, then swoop down on him)
 
 
 func _ready() -> void:
@@ -55,9 +59,9 @@ func _draw() -> void:
 func _bat_position(bat_index: int, local_time: float) -> Vector2:
 	var delay := float(bat_index % 7) * 0.045 + float(bat_index / 7) * 0.13
 	var start := Vector2(
-		528.0 + float((bat_index * 47) % 164),
-		748.0 + float((bat_index * 31) % 112)
-	)
+		528.0 + fposmod(float(bat_index*47),start_spread.x),
+		748.0 + fposmod(float(bat_index*31),start_spread.y)
+	) + start_shift
 	var impact_offset := Vector2.ZERO
 	if bat_index > 0:
 		impact_offset = Vector2(
@@ -73,12 +77,12 @@ func _bat_position(bat_index: int, local_time: float) -> Vector2:
 		var ratio := clampf(local_time / personal_impact_time, 0.0, 1.0)
 		var eased := smoothstep(0.0, 1.0, ratio)
 		var crosswind := sin(ratio * PI) * (10.0 + float(bat_index % 5) * 3.5)
-		return start.lerp(impact, eased) + Vector2(crosswind, -crosswind * 0.28)
+		return start.lerp(impact, eased) + Vector2(crosswind, -crosswind * 0.28 - approach_arc * sin(ratio * PI) * (0.75 + float(bat_index % 4) * 0.12))
 
 	var exit := Vector2(
 		-150.0 - float((bat_index * 29) % 180),
 		-40.0 + float((bat_index * 41) % 240)
-	)
+	) + exit_shift
 	var personal_exit_time := maxf(
 		personal_impact_time + 0.72,
 		FLOCK_EXIT_TIME - delay + float(bat_index % 3) * 0.06

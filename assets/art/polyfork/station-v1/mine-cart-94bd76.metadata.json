@@ -1,0 +1,232 @@
+{
+  "id": "mine-cart-94bd76",
+  "title": "Mine Cart",
+  "class": "prop",
+  "triangles": 816,
+  "kit": "loot-lode-kit-63191e",
+  "free": true,
+  "plan": "free",
+  "price_usd": 0,
+  "price_note": "free: every low poly model is. The /cdn links need no account and no key (an account adds the ready-to-serve zip). The HD edition, where `hd` is not null, comes with Pro",
+  "owned": true,
+  "page": "https://polyfork.dev/asset/mine-cart-94bd76",
+  "thumbnail": "https://polyfork.dev/files/mine-cart-94bd76/renders/hero.png",
+  "preview_glb": "https://polyfork.dev/cdn/mine-cart-94bd76-preview.glb",
+  "hd": {
+    "plan": "pro",
+    "page": "https://polyfork.dev/asset/mine-cart-94bd76?edition=hd",
+    "kind": "its own high poly program with pbr materials",
+    "triangles": 2250,
+    "preview_glb": "https://polyfork.dev/cdn/mine-cart-94bd76-hd-preview.glb",
+    "files": "https://polyfork.dev/dl/mine-cart-94bd76-hd.zip (Pro, with a key)"
+  },
+  "preview_triangles": 816,
+  "preview_fidelity": 1,
+  "preview_rigged": true,
+  "preview_rig": "pivots",
+  "preview_pivots": [
+    "tub",
+    "wheel-fl",
+    "wheel-fr",
+    "wheel-rl",
+    "wheel-rr"
+  ],
+  "preview_note": "This preview keeps its pivots named (preview_pivots), so they turn as rigged_parts describes; its normals are stripped for flat shading. This model is free, so build with `download.glb`: the authored file, normals and node names as built.",
+  "has_rig": true,
+  "remixable": true,
+  "has_night": false,
+  "has_decals": false,
+  "has_ik": false,
+  "ik_type": null,
+  "has_skeleton": false,
+  "size_m": {
+    "x": 0.8,
+    "y": 0.9,
+    "z": 1.23
+  },
+  "origin_y": 0,
+  "mass_kg": 1200,
+  "download": {
+    "glb": "https://polyfork.dev/cdn/mine-cart-94bd76.glb",
+    "mjs": "https://polyfork.dev/cdn/mine-cart-94bd76.mjs",
+    "auth": "none"
+  },
+  "export_formats": {
+    "fbx": {
+      "url": "https://polyfork.dev/dl/mine-cart-94bd76.fbx",
+      "for": "Unity, Unreal, Maya, 3ds Max",
+      "available": true
+    },
+    "usdz": {
+      "url": "https://polyfork.dev/dl/mine-cart-94bd76.usdz",
+      "for": "iOS AR Quick Look, Omniverse; with UsdPhysics collision and mass",
+      "available": true
+    },
+    "usda": {
+      "url": "https://polyfork.dev/dl/mine-cart-94bd76.usda",
+      "for": "Isaac Sim, Omniverse, Blender, usdview; with UsdPhysics collision and mass",
+      "available": true
+    },
+    "obj": {
+      "url": "https://polyfork.dev/dl/mine-cart-94bd76.obj",
+      "for": "universal, geometry only, no pivots",
+      "available": true,
+      "also_fetch": "https://polyfork.dev/dl/mine-cart-94bd76.mtl",
+      "also_fetch_note": "save it beside the .obj as mine-cart-94bd76.mtl: the model names that exact file and imports white without it"
+    }
+  },
+  "export_note": "vertex colours become NAMED MATERIALS on export, named after this asset's own colour knobs; a plain format conversion would arrive white, because only three.js reads our COLOR_0. Built on first request (about a second), cached after. This model is free: these download with no account and no key (only its .mjs source asks for a free account).",
+  "params_url": "https://polyfork.dev/cdn/mine-cart-94bd76-params.json",
+  "real_scale": null,
+  "physics": {
+    "mass_kg": 1200,
+    "mass_source": "estimated",
+    "material": "metal",
+    "body": "dynamic",
+    "dimensions_m": {
+      "x": 0.804,
+      "y": 0.901,
+      "z": 1.231
+    },
+    "up_axis": "Y",
+    "meters_per_unit": 1,
+    "volume_m3": 0.602026,
+    "collision": {
+      "approximation": "convexHull",
+      "parts": 15,
+      "colliders_url": "https://polyfork.dev/cdn/mine-cart-94bd76-colliders.json"
+    },
+    "note": "For the default knob settings; a size knob changes all of it. dimensions_m and the colliders are measured from the model; mass_kg and material are an estimate of what the real object weighs. body \"static\" means fixed in place (give it a collider, no rigid body); \"dynamic\" means it moves. collision.approximation uses UsdPhysics terms: \"convexHull\" = one hull is a good fit, \"convexDecomposition\" = use the per-part hulls in colliders_url (the one hull would fill a gap, like the space under a table). Model space, metres, Y up, origin as the model ships."
+  },
+  "simready_metadata": {
+    "simready_metadata_mass": 1200,
+    "simready_metadata_rigid_body_count": 1,
+    "usd_dimensions": [
+      0.804,
+      1.231,
+      0.901
+    ],
+    "usd_up_axis": "Z",
+    "usd_meters_per_unit": 1,
+    "simready_metadata_validation__profile": null
+  },
+  "materials": 2,
+  "draw_calls": 7,
+  "description": "Mine cart 1.2m long, 0.8m wide and 0.9m tall on four flanged iron wheels at the kit's 0.6m rail gauge: a riveted, iron-banded wooden ore tub with sloped sides, a front coupling hook and a push handle at the back. A load knob fills the tub with nothing.",
+  "palette": [
+    {
+      "hex": "#9b9592",
+      "share": 0.821
+    },
+    {
+      "hex": "#dddbdb",
+      "share": 0.078
+    },
+    {
+      "hex": "#886343",
+      "share": 0.051
+    },
+    {
+      "hex": "#986c46",
+      "share": 0.025
+    },
+    {
+      "hex": "#7b5c41",
+      "share": 0.007
+    },
+    {
+      "hex": "#704d33",
+      "share": 0.005
+    }
+  ],
+  "style": "low-poly, flat-shaded vertex colors, no textures, 2 materials: the shared opaque one plus a distinct surface (glass, water or chrome), which stays its own mesh through mergeAssets rather than merging into the rest; shares palette and scale with its kit",
+  "origin": "ground level (minY = 0): the model sits on y=0 as-is",
+  "rigged_parts": {
+    "tub": {
+      "axis": "z",
+      "range": [
+        0,
+        -40
+      ]
+    },
+    "wheel-fl": {
+      "axis": "x",
+      "range": [
+        0,
+        180
+      ]
+    },
+    "wheel-fr": {
+      "axis": "x",
+      "range": [
+        0,
+        180
+      ]
+    },
+    "wheel-rl": {
+      "axis": "x",
+      "range": [
+        0,
+        180
+      ]
+    },
+    "wheel-rr": {
+      "axis": "x",
+      "range": [
+        0,
+        180
+      ]
+    }
+  },
+  "detachable_parts": [],
+  "animation": "rigged parts are named groups with the pivot at the hinge/axle: obj.getObjectByName(part) then rotation[axis] (rotate, degrees) or position[axis] (slide, meters). 0 is the pose the model is built in, which is not always shut: `range` is all the travel the part has from there, and outside it the part passes through the body. Whether the range opens or closes is in that knob's describe in params_url",
+  "published_at": "2026-11-03 15:20:52",
+  "renders": [
+    "https://polyfork.dev/files/mine-cart-94bd76/renders/back.png",
+    "https://polyfork.dev/files/mine-cart-94bd76/renders/close.png",
+    "https://polyfork.dev/files/mine-cart-94bd76/renders/compare.png",
+    "https://polyfork.dev/files/mine-cart-94bd76/renders/detail.png",
+    "https://polyfork.dev/files/mine-cart-94bd76/renders/front.png",
+    "https://polyfork.dev/files/mine-cart-94bd76/renders/hero-crop.png",
+    "https://polyfork.dev/files/mine-cart-94bd76/renders/hero.png",
+    "https://polyfork.dev/files/mine-cart-94bd76/renders/left.png",
+    "https://polyfork.dev/files/mine-cart-94bd76/renders/low-back.png",
+    "https://polyfork.dev/files/mine-cart-94bd76/renders/low.png",
+    "https://polyfork.dev/files/mine-cart-94bd76/renders/pose-tub.png",
+    "https://polyfork.dev/files/mine-cart-94bd76/renders/pose-wheel-fl.png",
+    "https://polyfork.dev/files/mine-cart-94bd76/renders/pose-wheel-fr.png",
+    "https://polyfork.dev/files/mine-cart-94bd76/renders/pose-wheel-rl.png",
+    "https://polyfork.dev/files/mine-cart-94bd76/renders/pose-wheel-rr.png",
+    "https://polyfork.dev/files/mine-cart-94bd76/renders/proofs.png",
+    "https://polyfork.dev/files/mine-cart-94bd76/renders/right.png",
+    "https://polyfork.dev/files/mine-cart-94bd76/renders/top.png",
+    "https://polyfork.dev/files/mine-cart-94bd76/renders/under.png",
+    "https://polyfork.dev/files/mine-cart-94bd76/renders/views.png"
+  ],
+  "license": "Mesh files (GLB, FBX, USD, OBJ): CC BY 4.0 with the line in `credit`, or the Polyfork licence with no credit and no redistribution, your choice. The .mjs source and the HD edition: Polyfork licence only, commercial use, no attribution, no redistribution. https://polyfork.dev/licensing",
+  "credit": "Mine Cart by Polyfork (https://polyfork.dev/asset/mine-cart-94bd76), CC BY 4.0",
+  "access": {
+    "as": "anonymous",
+    "remix_bakes_per_hour": 40,
+    "remix_bakes_left_this_hour": 40,
+    "remix_note": "The budget is on generating NEW geometry. Variations anyone has already baked are served to everybody and never counted, so re-fetching a variant you or anyone else has made costs nothing.",
+    "remix_bakes_per_month": 100,
+    "remix_bakes_left_this_month": 89,
+    "remix_allowance_resets": "2026-12-01",
+    "remix_allowance_note": "Anonymous callers are counted per IP address, so other sessions from the same address share this. A free account raises it to 300 a WEEK on its own budget, and costs an email address.",
+    "a_free_account_adds": {
+      "how": "Authorization: Bearer <key>, created at https://polyfork.dev/account. Costs an email address.",
+      "remix_bakes_per_hour": 100,
+      "remix_bakes_per_week": 300,
+      "downloads": "every low poly model's .mjs program and a ready-to-serve zip from /dl, and any kit as one zip (/dl/kit-<id>.zip). The .glb, .fbx, .usdz, .usda and .obj need no key"
+    },
+    "pro_adds": {
+      "url": "https://polyfork.dev/pricing",
+      "usd_per_year": 149,
+      "hd_editions": "the HD edition of a model: the same program built finer, high poly with PBR materials generated in code, every knob still working. 1,762 models have one. Free accounts get its public preview (/cdn/<id>-hd-preview.glb) only",
+      "cdn": "a per-account /c/<token>/ path for the HD files you can hotlink from a shipped build; it keeps up when an asset is rebuilt, and the token is not the API key",
+      "remix_bakes_per_hour": 900,
+      "remix_bakes_per_week": "uncapped: a free account gets a weekly allowance, Pro does not"
+    }
+  }
+}

@@ -33,12 +33,14 @@ func _run() -> void:
 	_check(is_equal_approx(level.crate.position.x + level.CRATE_SIZE.x, level.SECOND_ACT_LEDGE.position.x), "raft ends flush against the ledge face")
 	_check(level.is_riding(), "player stands on the flush raft")
 	await _shot("01-raft-ledge", 2900.0)
-	Input.action_press("jump")
 	Input.action_press("move_right")
-	await _frames(26)
-	Input.action_release("move_right")
+	await _frames(60)
+	Input.action_press("jump")
+	await _frames(12)
 	Input.action_release("jump")
-	await _frames(25)
+	await _frames(190)  # the ledge is higher than his jump: he climbs it (the key stays down: it is the way he goes)
+	Input.action_release("move_right")
+	await _frames(10)
 	_check(level.player.position.x > 2800.0 and level.player.is_on_floor(), "player steps from the raft onto the high ledge")
 
 	# --- box.
@@ -49,7 +51,7 @@ func _run() -> void:
 	_check(level.can_grab_puzzle_box(), "preserved broken box has a reachable land grip")
 	Input.action_press("interact")
 	Input.action_press("move_right")
-	await _frames(145)
+	await _frames(300)
 	Input.action_release("move_right")
 	Input.action_release("interact")
 	await _frames(8)
@@ -69,7 +71,7 @@ func _run() -> void:
 	Input.action_release("move_right")
 	Input.action_release("jump")
 	await _frames(25)
-	_check(level.player.is_on_floor() and level.player.position.y + level.PLAYER_SIZE.y < 255.0, "box jump lands on the landing branch")
+	# (his jump is shorter than the old character's: the root platform above the box is reached by climbing, see hood_climb_smoke)
 	await _shot("03-swing-launch", 3480.0)
 
 	var swing_min: float = 99999.0

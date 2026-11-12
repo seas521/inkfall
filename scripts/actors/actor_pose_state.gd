@@ -1,9 +1,5 @@
 extends RefCounted
 
-const STYLE_LEGACY: StringName = &"legacy"
-const STYLE_VELVET: StringName = &"velvet_doll"
-const STYLE_SHADOW: StringName = &"pumpkin_shadow"
-const STYLE_CROOKED_TOWER: StringName = &"crooked_tower"
 const STYLE_HOOD: StringName = &"hood"  # the hooded boy (hood_frame_actor.gd)
 const HOOD_RUN_SPEED_SCALE := 0.4737  # his run speed against the level's RUN_SPEED (285 px/s): 135 px/s (the recorded jog moves its feet at 78: the loop plays 1.25x, see HOOD_RUN_ANIM_SPEED)
 const HOOD_AIR_SPEED_SCALE := 0.8  # in the air he can go a little faster (a lunge), so a jump still gets across the gap
@@ -45,10 +41,12 @@ const ACTION_GET_UP: StringName = &"get_up"
 const ACTION_UNCONTROLLED_FALL: StringName = &"uncontrolled_fall"
 const ACTION_FALL_IMPACT: StringName = &"fall_impact"
 const ACTION_FALL_DOWNED: StringName = &"fall_downed"
+const ACTION_TIRED_STOP: StringName = &"tired_stop"  # staggers to a halt and bends over (progress 0..1 over the clip)
+const ACTION_PANT: StringName = &"pant"  # bent over, hands on his knees, breathing hard (progress 0..1 is one breath: it loops)
 const ACTION_CLIMB: StringName = &"climb"  # hands over a ledge: hang, pull up, crawl, stand (the clip's root is the ledge corner)
 
 var active := true
-var style_id: StringName = STYLE_LEGACY
+var style_id: StringName = STYLE_HOOD
 var feet := Vector2.ZERO
 var velocity := Vector2.ZERO
 var grounded := false
@@ -70,7 +68,9 @@ var combo_index := 0
 var small_item_kind: StringName = &""
 var small_item_radius := 8.0
 var small_item_origin := Vector2(-9999.0, -9999.0)  # screen position where the item lay before it was picked up
-var visual_scale := 1.0
+# Shared gameplay size. Scene composition must not resize the player.
+const HOOD_VISUAL_SCALE := 0.90
+var visual_scale := HOOD_VISUAL_SCALE
 var fog_blur := 0.0
 var monochrome := false
 var clip_flip_h := false
@@ -82,7 +82,7 @@ var alarm := false  # frozen in fright (the hooded boy shows the scared pose)
 
 func apply(source: Dictionary) -> void:
 	active = bool(source.get("active", true))
-	style_id = StringName(source.get("style_id", STYLE_LEGACY))
+	style_id = StringName(source.get("style_id", STYLE_HOOD))
 	feet = Vector2(source.get("feet", Vector2.ZERO))
 	velocity = Vector2(source.get("velocity", Vector2.ZERO))
 	grounded = bool(source.get("grounded", false))
@@ -103,7 +103,7 @@ func apply(source: Dictionary) -> void:
 	small_item_kind = StringName(source.get("small_item_kind", ""))
 	small_item_radius = maxf(4.0, float(source.get("small_item_radius", 8.0)))
 	small_item_origin = Vector2(source.get("small_item_origin", Vector2(-9999.0, -9999.0)))
-	visual_scale = clampf(float(source.get("visual_scale", 1.0)), 0.5, 1.5)
+	visual_scale = clampf(float(source.get("visual_scale", HOOD_VISUAL_SCALE)), 0.5, 1.5)
 	fog_blur = clampf(float(source.get("fog_blur", 0.0)), 0.0, 4.0)
 	monochrome = bool(source.get("monochrome", false))
 	clip_flip_h = bool(source.get("clip_flip_h", false))

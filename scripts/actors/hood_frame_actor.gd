@@ -12,6 +12,9 @@ extends Node2D
 const ActorPoseState = preload("res://scripts/actors/actor_pose_state.gd")
 const SmallItemRenderer = preload("res://scripts/actors/small_item_renderer.gd")
 const Manifest = preload("res://scripts/actors/hood_actor_manifest.gd")
+const EyeTracks = preload("res://scripts/actors/hood_eye_tracks.gd")
+const EyeLight = preload("res://scripts/actors/hood_eye_light.gd")
+const EyeRepairMask = preload("res://scripts/actors/hood_eye_repair_mask.gd")
 
 const DISPLAY_SCALE := 0.42  # the same as the previous actor (a 200 px standing figure -> 84 px)
 # The run (Seedance 1427, an upright, weak jog): a 45 frame loop of two steps; as recorded (2.7 steps/s) its feet move at about 78 px/s. He runs
@@ -44,11 +47,13 @@ const THROW_HAND_OVER_FRAME := 17  # the stone leaves the hand (the clip's own r
 const FOOT_CONTACTS := {&"tired_start": [29, 50], &"tired_run": [16, 38], &"small_run_l1": [3, 15]}
 static var footstep_serial := 0  # grows by one on every foot-down while running; the surface audio follows it
 const KNOCKDOWN_STAGGER_SHARE := 0.6  # of the knock-down action: the stagger, then straight down onto the ground
+const TIRED_STOP_FROM := 8.0  # the stagger clip is entered this many frames in (frame 0 is a full stride)
 const KNOCKDOWN_STAGGER_FRAMES := 42  # fall_air after this turns into a flying dive, which is too airborne for a bat hit
 
 var pose
 var body: Node2D
 var sprite: Sprite2D
+var eye_light:Node2D
 var refresh := 60.0
 var textures := {}  # clip -> Array[Texture2D]
 var loaded_groups := {}
@@ -101,6 +106,7 @@ var on_ground := true
 var run_hold := 0.0
 var body_offset := Vector2.ZERO  # px, added to the body (contact alignment in the C zone)
 var body_lift := 0.0  # px above the feet the clip root sits (the fall loop is rooted at his centre)
+var pose_sync_count := 0 # diagnostic: one active pose update per physics frame
 
 func _ready() -> void:
 	refresh = DisplayServer.screen_get_refresh_rate()
@@ -123,6 +129,11 @@ func _ready() -> void:
 	item_node = SmallItemRenderer.new()
 	item_node.hide()
 	body.add_child(item_node)
+	eye_light=EyeLight.new()
+	# Same world plane as the body; later sibling draws the eye over its
+	# sprite without lifting it above foreground rocks (actor 5 -> eye 7).
+	eye_light.z_index=0
+	body.add_child(eye_light)
 	hide()
 
 func _build_material() -> ShaderMaterial:
@@ -136,25 +147,57 @@ uniform float texel_scale = 2.6;  // texels per screen pixel (the frames are shr
 uniform float soften = 0.8;  // screen pixels of softness every silhouette gets, so its edge is as soft as the ink around it
 uniform vec3 ink = vec3(0.022, 0.025, 0.025);  // the scene's black is not (0, 0, 0)
 
+uniform vec2 impact_center=vec2(0.5);
+uniform vec2 impact_radius=vec2(1.0);
+uniform vec2 impact_push=vec2(0.0);
+
+uniform vec2 source_eye = vec2(-1000.0);
+uniform bool source_eye_visible = false;
+uniform sampler2D eye_repair : filter_nearest, repeat_disable;
+varying vec4 actor_tint;
+void vertex(){actor_tint=COLOR;}
+vec4 body_sample(vec4 c,float repair,vec2 at,vec2 pixel_size){
+ float amber=smoothstep(0.018,0.085,c.r-max(c.g,c.b))*smoothstep(0.05,0.22,c.r);
+ // Seedance bakes a neutral white rim around some amber eyes. Remove the
+ // whole local feature before filtering, not just its colored centre.
+ float eye_distance=length((at-source_eye)/pixel_size/vec2(18.0,20.0));
+ if(source_eye_visible)amber=max(amber,1.0-smoothstep(0.8,1.0,eye_distance));
+ c.rgb=mix(c.rgb,vec3(0.0),amber);
+ c.a=max(c.a,repair);
+ c.rgb=mix(c.rgb,vec3(0.0),repair);
+ return c;
+}
+
 void fragment() {
+	vec2 q=(UV-impact_center)/max(impact_radius,vec2(0.001));
+	float pressure=exp(-dot(q,q)*2.0);
+	vec2 body_uv=UV-impact_push*pressure;
+	body_uv.x-=q.x*abs(impact_push.y)*0.14*pressure;
 	// a ring of 8 taps plus the centre: the edge is a soft, even falloff, not a hard cut-out
 	vec2 px = TEXTURE_PIXEL_SIZE * (fog_blur + soften * texel_scale);
-	vec4 color = texture(TEXTURE, UV) * 0.28;
-	color += texture(TEXTURE, UV + vec2(px.x, 0.0)) * 0.09;
-	color += texture(TEXTURE, UV - vec2(px.x, 0.0)) * 0.09;
-	color += texture(TEXTURE, UV + vec2(0.0, px.y)) * 0.09;
-	color += texture(TEXTURE, UV - vec2(0.0, px.y)) * 0.09;
-	color += texture(TEXTURE, UV + px * 0.7071) * 0.09;
-	color += texture(TEXTURE, UV - px * 0.7071) * 0.09;
-	color += texture(TEXTURE, UV + vec2(px.x, -px.y) * 0.7071) * 0.09;
-	color += texture(TEXTURE, UV + vec2(-px.x, px.y) * 0.7071) * 0.09;
+	vec4 color = body_sample(texture(TEXTURE,body_uv),texture(eye_repair,body_uv).r,body_uv,TEXTURE_PIXEL_SIZE) * 0.28;
+	color += body_sample(texture(TEXTURE,body_uv + vec2(px.x, 0.0)),texture(eye_repair,body_uv + vec2(px.x, 0.0)).r,body_uv + vec2(px.x, 0.0),TEXTURE_PIXEL_SIZE) * 0.09;
+	color += body_sample(texture(TEXTURE,body_uv - vec2(px.x, 0.0)),texture(eye_repair,body_uv - vec2(px.x, 0.0)).r,body_uv - vec2(px.x, 0.0),TEXTURE_PIXEL_SIZE) * 0.09;
+	color += body_sample(texture(TEXTURE,body_uv + vec2(0.0, px.y)),texture(eye_repair,body_uv + vec2(0.0, px.y)).r,body_uv + vec2(0.0, px.y),TEXTURE_PIXEL_SIZE) * 0.09;
+	color += body_sample(texture(TEXTURE,body_uv - vec2(0.0, px.y)),texture(eye_repair,body_uv - vec2(0.0, px.y)).r,body_uv - vec2(0.0, px.y),TEXTURE_PIXEL_SIZE) * 0.09;
+	color += body_sample(texture(TEXTURE,body_uv + px * 0.7071),texture(eye_repair,body_uv + px * 0.7071).r,body_uv + px * 0.7071,TEXTURE_PIXEL_SIZE) * 0.09;
+	color += body_sample(texture(TEXTURE,body_uv - px * 0.7071),texture(eye_repair,body_uv - px * 0.7071).r,body_uv - px * 0.7071,TEXTURE_PIXEL_SIZE) * 0.09;
+	color += body_sample(texture(TEXTURE,body_uv + vec2(px.x, -px.y) * 0.7071),texture(eye_repair,body_uv + vec2(px.x, -px.y) * 0.7071).r,body_uv + vec2(px.x, -px.y) * 0.7071,TEXTURE_PIXEL_SIZE) * 0.09;
+	color += body_sample(texture(TEXTURE,body_uv + vec2(-px.x, px.y) * 0.7071),texture(eye_repair,body_uv + vec2(-px.x, px.y) * 0.7071).r,body_uv + vec2(-px.x, px.y) * 0.7071,TEXTURE_PIXEL_SIZE) * 0.09;
 	if (monochrome) {
 		float value = dot(color.rgb, vec3(0.299, 0.587, 0.114));
 		color.rgb = vec3(value);
 	}
-	// black becomes the scene's ink (the orange of the eye stays as it is)
+	// Baked eye colors are suppressed, including ghosts; one tracked light
+	// draws the same eye in every clip without duplicate afterimage eyes.
 	color.rgb += ink * (1.0 - clamp(dot(color.rgb, vec3(0.333)) * 3.0, 0.0, 1.0));
-	COLOR = color * COLOR;
+	// Preserve the approved silhouette's original RGB/alpha multiplication.
+	// Only the enclosed eye repair bypasses source alpha; the rest of the
+	// body must keep its original black, not expose the lighter ink uniform.
+	vec4 original = texture(TEXTURE,UV);
+	float repaired = texture(eye_repair,UV).r;
+	COLOR = color * actor_tint * vec4(original.rgb,max(original.a,repaired));
+	COLOR.rgb *= 1.0-repaired;
 }
 """
 	var material := ShaderMaterial.new()
@@ -233,6 +276,7 @@ func is_finished() -> bool:
 # --- pose -> clip (P0: idle, run and the jump phases; the actions come in the next phases) -------------
 
 func sync_pose(delta: float, next_pose) -> void:
+	pose_sync_count+=1
 	pose = next_pose
 	show()
 	var dt := _step(delta)
@@ -305,7 +349,7 @@ func sync_pose(delta: float, next_pose) -> void:
 		var wanted := _choose_clip()
 		if wanted != current_clip or (not playing and bool(Manifest.CLIPS[String(wanted)]["loop"])):
 			if wanted != current_clip:
-				_begin_ghost(_blend_time(current_clip, wanted), current_clip == &"climb")
+				_begin_ghost(_blend_time(current_clip, wanted), current_clip in [&"climb",&"rope_ladder"])
 				if (current_clip == &"climb" or current_clip == &"run_stop") and wanted == &"idle_left":
 					breath_ramp = 0.0  # the idle's breathing comes in gently, not at full depth on the first frame
 			play(wanted, pending_from)
@@ -333,6 +377,8 @@ func sync_pose(delta: float, next_pose) -> void:
 		if wanted_clip != current_clip:
 			if wanted_clip == &"climb" or current_clip == &"climb":
 				_begin_ghost(_blend_time(current_clip, wanted_clip), true)
+			elif wanted_clip in [&"tired_stop", &"tired_idle"] or current_clip in [&"tired_stop", &"tired_idle"]:
+				_begin_ghost(_blend_time(current_clip, wanted_clip))
 			play(wanted_clip)
 		if action.has("frame"):
 			var frame_count := int(Manifest.CLIPS[String(wanted_clip)]["frames"])
@@ -366,11 +412,21 @@ func _action_frame() -> Dictionary:
 	# What the controller is doing to him (knock-down, getting up, a fall, a hit) decides the clip.
 	var progress_now := float(pose.action_progress)
 	match pose.action:
+		&"low_enter",&"low_idle",&"low_walk",&"low_exit":
+			load_group("low_stance")
+			return {"clip":pose.action,"progress":progress_now}
 		ActorPoseState.ACTION_KNOCKDOWN:
 			if progress_now < KNOCKDOWN_STAGGER_SHARE:
 				var stagger := progress_now / KNOCKDOWN_STAGGER_SHARE
 				return {"clip": &"fall_air", "progress": stagger * float(KNOCKDOWN_STAGGER_FRAMES) / float(int(Manifest.CLIPS["fall_air"]["frames"]) - 1)}
 			return {"clip": &"fall_impact", "progress": (progress_now - KNOCKDOWN_STAGGER_SHARE) / (1.0 - KNOCKDOWN_STAGGER_SHARE)}
+		ActorPoseState.ACTION_TIRED_STOP:
+			if has_clip(&"tired_stop"):
+				# the first frames are still the stride of the run: he picks it up from where he is bent
+				return {"clip": &"tired_stop", "frame": lerpf(TIRED_STOP_FROM, float(int(Manifest.CLIPS["tired_stop"]["frames"]) - 1), progress_now)}
+		ActorPoseState.ACTION_PANT:
+			if has_clip(&"tired_idle"):
+				return {"clip": &"tired_idle", "frame": fposmod(progress_now, 1.0) * float(int(Manifest.CLIPS["tired_idle"]["frames"]) - 1)}
 		ActorPoseState.ACTION_DOWNED:
 			return {"clip": &"downed"}
 		ActorPoseState.ACTION_FALL_IMPACT:
@@ -474,6 +530,7 @@ func _apply() -> void:
 	var clip := String(current_clip)
 	if not textures.has(clip):
 		sprite.hide()
+		eye_light.hide()
 		return
 	var data: Dictionary = Manifest.CLIPS[clip]
 	var rect: Array = data["rects"][current_frame_index]
@@ -508,9 +565,16 @@ func _apply() -> void:
 		fade = 1.0 - smoothstep(0.80, 1.0, pose.failure_time / maxf(0.01, pose.failure_duration))
 	modulate.a = fade
 	var material := sprite.material as ShaderMaterial
+	material.set_shader_parameter("eye_repair",EyeRepairMask.texture_for(clip,current_frame_index,Vector2i(sprite.texture.get_size())))
 	material.set_shader_parameter("fog_blur", pose.fog_blur)
 	material.set_shader_parameter("monochrome", pose.monochrome)
 	material.set_shader_parameter("texel_scale", 1.0 / maxf(scale_value, 0.05))
+	var eyes:Array=EyeTracks.DATA.get(clip,[])
+	var eye_track:Array=eyes[current_frame_index] if current_frame_index<eyes.size() else []
+	material.set_shader_parameter("source_eye_visible",not eye_track.is_empty() and float(eye_track[3])>0.0)
+	if not eye_track.is_empty():
+		material.set_shader_parameter("source_eye",(Vector2(float(eye_track[0]),float(eye_track[1]))-sprite.position)/Vector2(sprite.texture.get_size()))
+	eye_light.sync_eye(eyes[current_frame_index] if current_frame_index<eyes.size() else [],pose.monochrome,pose.fog_blur)
 	_update_item(scale_value)
 
 # --- the item in his hand ---------------------------------------------------------------------------
@@ -626,6 +690,19 @@ func _run_frame_after_landing() -> int:
 # How long to cross-fade from one clip into the next: none where the next clip begins on the frame the last one ends
 # on, a little where two poses are merely close, longer from the bent-over panting back to standing.
 func _blend_time(from_clip: StringName, to_clip: StringName) -> float:
+	if from_clip==&"rope_ladder":
+		if to_clip==&"idle_left" and current_frame_index>=232:
+			# The upright exit already matches the idle's size. Superimposing
+			# both slightly offset silhouettes makes an extra-wide outline for
+			# a few frames, then looks like a sudden slimming as it disappears.
+			return 0.0
+		return 0.10 # source root is ladder-top based; preserve its world position
+	if to_clip == &"tired_stop":
+		return 0.16  # from the walk into the stagger: twdo near poses, not the same frame
+	if from_clip == &"tired_stop" and to_clip == &"tired_idle":
+		return 0.0  # the same video: it ends on the picture the panting begins with
+	if from_clip == &"tired_idle" or from_clip == &"tired_stop":
+		return 0.10  # (the knock-down)
 	if from_clip == &"tired_start" and to_clip == &"tired_run":
 		return 0.0
 	if from_clip == &"idle_left" and to_clip == &"tired_start":
@@ -648,6 +725,7 @@ func _begin_ghost(duration: float, root_moved := false) -> void:
 	if duration <= 0.0 or sprite.texture == null or not sprite.visible:
 		return
 	ghost.texture = sprite.texture
+	ghost.material = sprite.material.duplicate()
 	# the old picture stays where it was drawn, even if the new clip is rooted somewhere else (the climb is rooted at the ledge)
 	var scale_value: float = DISPLAY_SCALE * float(pose.visual_scale)
 	var face: float = 1.0 if pose.clip_flip_h else float(pose.facing)
@@ -689,3 +767,18 @@ func _count_footsteps(from_index: int, to_index: int) -> void:
 		guard += 1
 		if index in FOOT_CONTACTS[current_clip]:
 			footstep_serial += 1
+
+# World-space local pressure only; leaves the shared body scale and eye system intact.
+func apply_local_impact(world_center:Vector2,amount:float)->void:
+	var material_value:=sprite.material as ShaderMaterial
+	if amount<=0.0001:
+		material_value.set_shader_parameter("impact_push",Vector2.ZERO)
+		return
+	var local:=sprite.to_local(world_center)
+	var size:Vector2=sprite.texture.get_size()
+	var dx:Vector2=sprite.to_local(world_center+Vector2(12,0))-local
+	var dy:Vector2=sprite.to_local(world_center+Vector2(0,13))-local
+	material_value.set_shader_parameter("impact_center",local/size)
+	material_value.set_shader_parameter("impact_radius",Vector2(dx.length()/size.x,dy.length()/size.y))
+	var push:Vector2=sprite.to_local(world_center+Vector2(0,7.2*amount))-local
+	material_value.set_shader_parameter("impact_push",push/size)

@@ -3,7 +3,7 @@ extends Node2D
 # Test scene for the Seedance frame clips of the hooded boy. Not connected to level 1.
 #   A / D or arrows   run left / right at one constant speed; let go to stop; pressing the other way
 #                     turns him and he runs that way at once (same as level 1)
-#   W / Up / Space    jump (real physics, same numbers as level 1; hold = higher, let go early = lower)
+#   Space             jump (real physics, same numbers as level 1; hold = higher, let go early = lower)
 #   F   trip and fall from the air: tumble -> hits the ground -> lies still -> any key gets him up
 #   G   flinch (a scare / a hit): jerks back, then relaxes; moving again cuts it short
 #   E   grab the box (walks up to it first), E again lets go. Holding the key toward the box pushes it,
@@ -16,7 +16,7 @@ extends Node2D
 #       jump to get out of it, or it lets go after a few seconds
 #   V   drop into the pool on the right: plunge, then thrash at the surface; A/D swims, X lets him drown
 #   B   (while running) the scared emergency brake: stops dead, freezes, then relaxes (for the C zone rocks)
-#   C   show the current knight next to it      +/- scale     R   reset
+#   +/- scale     R   reset
 # Everything follows level 1 (scripts/core/player_controller.gd): speed follows the key at once, on the
 # ground and in the air; the jump is a velocity + gravity; the jump buffer (0.13s) and coyote time
 # (0.12s) are the same. The animation never holds the controls: it only reads the state, exactly like
@@ -39,7 +39,6 @@ const CLIPS := [
 	"water_wade", "water_plunge", "water_tread", "water_swim", "water_drown",
 ]
 const ROOT_PATH := "res://assets/art/prototypes/hood_clips"
-const OLD_ROOT := "res://assets/art/actors/crooked_tower_seedance"
 const GROUND_Y := 560.0
 const CANVAS_ROOT := Vector2(128.0, 232.0)
 # Level 1 numbers (Palette). The sprite here is drawn bigger than in level 1 (0.62 vs 0.42), so the
@@ -90,8 +89,6 @@ var launch_exit := 0  # run_left index after the short rest_to_run transition
 var rest_entry := 0  # run_left frame to start the run from when leaving the resting pose
 var stop_exit: Array = []  # stop_left frame -> run_left frame to continue from
 var stop_entry: Array = []  # run_left frame -> stop_left frame to start from
-var old_sprite: Sprite2D
-var old_travel := 0.0
 var forced_dir := NAN  # set by the capture script instead of the keyboard
 var forced_jump_held := false
 var forced_p_held := false
@@ -211,12 +208,6 @@ func _ready() -> void:
 	rock.visible = false
 	add_child(rock)
 	_make_items()
-	old_sprite = Sprite2D.new()
-	old_sprite.centered = false
-	old_sprite.offset = -CANVAS_ROOT
-	old_sprite.visible = false
-	old_sprite.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS
-	add_child(old_sprite)
 	info = Label.new()
 	info.position = Vector2(24, 18)
 	info.add_theme_color_override("font_color", Color(0.05, 0.05, 0.05))
@@ -245,7 +236,7 @@ func _unhandled_key_input(event: InputEvent) -> void:
 		return
 	match key.keycode:
 		KEY_R: reset()
-		KEY_W, KEY_UP, KEY_SPACE:
+		KEY_SPACE:
 			jump_buffer = 0.13  # level 1: the press is remembered for 0.13s
 		KEY_P:
 			_on_p_pressed()
@@ -276,7 +267,6 @@ func _unhandled_key_input(event: InputEvent) -> void:
 		KEY_B:
 			if state == "run" or state == "launch":
 				_enter("scared")
-		KEY_C: old_sprite.visible = not old_sprite.visible
 		KEY_EQUAL, KEY_KP_ADD: clip_scale = minf(1.2, clip_scale + 0.05)
 		KEY_MINUS, KEY_KP_SUBTRACT: clip_scale = maxf(0.3, clip_scale - 0.05)
 
@@ -295,7 +285,7 @@ func _process(delta: float) -> void:
 				_begin_engage()
 			else:
 				_begin_pickup()
-	jump_held = forced_jump_held or Input.is_key_pressed(KEY_W) or Input.is_key_pressed(KEY_UP) or Input.is_key_pressed(KEY_SPACE)
+	jump_held = forced_jump_held or Input.is_key_pressed(KEY_SPACE)
 	tick(delta, dir)
 
 func _clip_for(s: String) -> String:
@@ -999,8 +989,7 @@ func tick(raw_delta: float, dir: float) -> void:
 	# The clips face left; facing right is the mirror image.
 	sprite.scale = Vector2(clip_scale * (-1.0 if facing > 0.0 else 1.0), clip_scale)
 	_update_item(delta)
-	_update_old(delta)
-	info.text = "A/D 跑（匀速）  松手停  W/空格 跳(按住更高)  B 惊恐急刹(跑动中)  F 跌落  G 受惊  E 抓箱/松手  P 拾取/放下/按住投掷  C 对比旧角色  +/- 大小(%.2f)\n状态 %s   速度 %d   高度 %d" % [clip_scale, state, int(absf(vx)), int(-air_y)]
+	info.text = "A/D 跑（匀速）  松手停  空格 跳(按住更高)  B 惊恐急刹(跑动中)  F 跌落  G 受惊  E 抓箱/松手  P 拾取/放下/按住投掷  C 对比旧角色  +/- 大小(%.2f)\n状态 %s   速度 %d   高度 %d" % [clip_scale, state, int(absf(vx)), int(-air_y)]
 
 func _update_air(delta: float) -> void:
 	if state == "fall":
@@ -1030,13 +1019,3 @@ func _update_air(delta: float) -> void:
 		on_ground = true
 		_land()
 
-func _update_old(delta: float) -> void:
-	if not old_sprite.visible:
-		return
-	old_travel += absf(vx) * delta
-	var moving := absf(vx) > 25.0
-	var index := int(floor(old_travel / (116.0 * clip_scale / 0.9 / 15.0))) % 15
-	var path := "%s/run/frame_%02d.png" % [OLD_ROOT, index] if moving else "%s/idle/frame_00.png" % OLD_ROOT
-	old_sprite.texture = load(path)
-	old_sprite.position = Vector2(pos_x - 260.0, GROUND_Y)
-	old_sprite.scale = Vector2(clip_scale * (1.0 if facing > 0.0 else -1.0), clip_scale)

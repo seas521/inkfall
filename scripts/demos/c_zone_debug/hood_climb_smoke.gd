@@ -64,7 +64,6 @@ func _run_and_jump(face_x: float, gap: float) -> void:
 	Input.action_release("jump")
 
 func _run() -> void:
-	ActorStyleHost.style_override = ActorPoseState.STYLE_HOOD
 	level = SCENE.instantiate()
 	root.add_child(level)
 	await _frames(10)

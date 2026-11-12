@@ -25,7 +25,6 @@ func _check(condition: bool, description: String) -> void:
 		print("FAIL: ", description)
 
 func _run() -> void:
-	ActorStyleHost.style_override = ActorPoseState.STYLE_HOOD
 	level = SCENE.instantiate()
 	root.add_child(level)
 	await _frames(10)

@@ -44,7 +44,6 @@ func _diff(a: Dictionary, b: Dictionary) -> int:
 	return n
 
 func _run() -> void:
-	ActorStyleHost.style_override = ActorPoseState.STYLE_HOOD
 	level = SCENE.instantiate()
 	root.add_child(level)
 	for i in 10: await physics_frame

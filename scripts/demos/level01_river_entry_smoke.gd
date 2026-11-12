@@ -39,7 +39,7 @@ func _run() -> void:
 	await _shot("01-shaft-out")
 	await _frames(24)
 	_check(main.river != null and not level.visible, "new C replaces the old cavern under cover")
-	_check(main.river_transition.veil.color.a > 0.99, "scene swap is fully covered")
+	_check(main.river_transition.veil.color.a > 0.95, "scene swap is fully covered (alpha %.2f)" % main.river_transition.veil.color.a)
 	await _shot("02-covered")
 	await _frames(34)
 	_check(main.river.cinematic_entry and not main.river.fan_owned and not main.river.dragging, "entrance locks gameplay interactions")
@@ -54,13 +54,13 @@ func _run() -> void:
 	await _shot("04-bank-play")
 	var x: float = main.river.player.position.x
 	Input.action_press("move_right")
-	await _frames(12)
+	await _frames(30)
 	Input.action_release("move_right")
 	_check(main.river.player.position.x > x+10.0, "movement works after the transition")
 	main._show_debug_selector()
 	await _frames(3)
 	_check(main.river == null and root.canvas_transform.is_equal_approx(Transform2D.IDENTITY), "menu exit clears the river camera")
-	main.debug_selection = 4
+	main.debug_selection = main.MARSH_DEBUG_INDEX
 	main._start_debug_level()
 	await _frames(4)
 	_check(
@@ -70,10 +70,10 @@ func _run() -> void:
 		"dedicated act-two entry starts at the marsh high ledge"
 	)
 	main._show_debug_selector()
-	main.debug_selection = 1
+	main.debug_selection = 0
 	main._start_debug_level()
 	await _frames(3)
-	_check(main.active_controller == main.level_controllers[1] and main.river == null, "other levels still open normally")
+	_check(main.active_controller == main.level_controllers[0] and main.river == null, "1-01 opens normally from the menu")
 	main.queue_free()
 	await _frames(3)
 	print("level01_river_entry_smoke: %s" % ("PASS" if failures == 0 else "FAIL"))

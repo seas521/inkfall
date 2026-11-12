@@ -1,6 +1,5 @@
 extends Node2D
 
-const ActorStyleHostRef = preload("res://scripts/actors/actor_style_host.gd")
 
 # Third act of the C zone: the broken drawbridge and the cliff lift.
 #
@@ -324,7 +323,7 @@ func on_cage() -> bool:
 	return absf(feet.y - cage_top()) < 9.0 and feet.x > LIFT_X + 6.0 and feet.x < LIFT_X + LIFT_W - 6.0 and player.is_on_floor()
 
 func _hood() -> bool:
-	return ActorStyleHostRef.style_override == Pose.STYLE_HOOD
+	return true
 
 func release_origin() -> Vector2:
 	return level.player.position + Vector2(13.0 + float(level.facing) * 16.0, 16.0)

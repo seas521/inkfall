@@ -25,7 +25,6 @@ func _wait_snaps(seconds: float, step: float, tag: String) -> void:
 
 func _run() -> void:
 	DirAccess.make_dir_recursive_absolute(OUT)
-	ActorStyleHost.style_override = ActorPoseState.STYLE_HOOD
 	var main = MAIN_SCENE.instantiate()
 	root.add_child(main)
 	await create_timer(0.5).timeout

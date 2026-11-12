@@ -15,15 +15,25 @@ const SCREEN := Palette.SCREEN
 const PLAYER_SIZE := Palette.PLAYER_SIZE
 const INK := Palette.INK
 const PAPER := Palette.PAPER
-const MARSH_DEBUG_INDEX := 4
-const CLIFF_DEBUG_INDEX := 5
-const MAX_DEBUG_INDEX := 5
+# The DEBUG menu: 0 = 1-01 (the surface, the shaft, then the C zone), 1 to 3 = the C zone's later acts started directly.
+const MARSH_DEBUG_INDEX := 1
+const CLIFF_DEBUG_INDEX := 2
+const FOREST_DEBUG_INDEX := 3
+const SCENE1_DEBUG_INDEX := 4
+const DESCENT_DEBUG_INDEX := 5
+const LOG_BRIDGE_DEBUG_INDEX := 6
+const ROPE_LADDER_DEBUG_INDEX := 7
+const CLIFF_ENTRY_DEBUG_INDEX := 8
+const STATION_DEBUG_INDEX := 9
+const SCREE_DEBUG_INDEX := 10
+const MAX_DEBUG_INDEX := 10
+const CHAPTER_ROUTE := "res://scenes/chapters/chapter_01_route.tscn"
 const DEBUG_RETURN_META := &"inkfall_debug_return"
 const RiverTransition = preload("res://scripts/levels/level01_river_transition.gd")
 const FilmLook = preload("res://scripts/effects/film_look.gd")
 
 @export_category("DEBUG")
-@export_enum("运行时关卡菜单", "1-01 · 墨坠井", "1-02 · 风化绳崖", "1-03 · 月炉木屋与根下旧矿", "原创场景 · 沉钟雾谷", "C区第二幕 · 枯枝瘴沼", "C区第三幕 · 断桥与升降梯")
+@export_enum("运行时关卡菜单", "1-01 · 墨坠井", "C区第二幕 · 枯枝瘴沼", "C区第三幕 · 断桥与升降梯", "C区第四幕 · 山坡与森林", "章节 1 · 森林至 C 区（连续试玩）", "场景 2～6 · 崖下美术巡览", "场景 2 · 断木斜桥（玩法）", "场景 2 · 崖间绳梯（玩法）", "章节 1 · 悬崖衔接（测试）", "章节 1 · 双路吊运站（新）", "章节 1 · 落石栈道（新）")
 var debug_start_level: int = 0
 
 var game_context = GameContext.new()
@@ -106,24 +116,46 @@ func _show_debug_selector() -> void:
 
 func _start_debug_level() -> void:
 	debug_selector_open = false
-	_activate_level(debug_selection)
+	# the menu entries start level 0 (1-01) normally, or level 0's C zone directly at a later act
+	_activate_level(0)
+	match debug_selection:
+		MARSH_DEBUG_INDEX:
+			_mount_river(false)
+			river.debug_enter_marsh_act()
+		CLIFF_DEBUG_INDEX:
+			_mount_river(false)
+			river.debug_enter_cliff_act()
+		FOREST_DEBUG_INDEX:
+			_mount_river(false)
+			river.debug_enter_forest_act()
+		SCENE1_DEBUG_INDEX:
+			_mount_river(false,CHAPTER_ROUTE)
+		DESCENT_DEBUG_INDEX:
+			_mount_river(false)
+			river.debug_enter_descent()
+		LOG_BRIDGE_DEBUG_INDEX:
+			_mount_river(false)
+			river.debug_enter_log_bridge()
+		ROPE_LADDER_DEBUG_INDEX:
+			_mount_river(false)
+			river.debug_enter_rope_ladder(false)
+		CLIFF_ENTRY_DEBUG_INDEX:
+			_mount_river(false,CHAPTER_ROUTE)
+			river.enter_cliff_test()
+		STATION_DEBUG_INDEX:
+			_mount_river(false,CHAPTER_ROUTE)
+			river.enter_station_test()
+		SCREE_DEBUG_INDEX:
+			_mount_river(false,CHAPTER_ROUTE)
+			river.enter_scree_test()
+	queue_redraw()
 
+# `index` is the level controller (0 = 1-01; the others are the earlier prototypes the old progression still reaches)
 func _activate_level(index: int) -> void:
 	_clear_river()
 	if active_controller != null: active_controller.leave()
-	var controller_index := index
-	if index == 3:
-		controller_index = 3
-	elif index == MARSH_DEBUG_INDEX or index == CLIFF_DEBUG_INDEX:
-		controller_index = 0
-	active_controller = level_controllers[controller_index]
+	active_controller = level_controllers[index]
 	active_controller.enter(game_context, ui_font, self)
-	if index == MARSH_DEBUG_INDEX:
-		_mount_river(false)
-		river.debug_enter_marsh_act()
-	elif index == CLIFF_DEBUG_INDEX:
-		_mount_river(false)
-		river.debug_enter_cliff_act()
 	queue_redraw()
 
 func _begin_river_transition() -> void:
@@ -143,7 +175,8 @@ func _tick_river_transition(delta: float) -> void:
 			_mount_river(true)
 	if river != null:
 		var reveal := smoothstep(RiverTransition.REVEAL_TIME, RiverTransition.DURATION, time)
-		river.camera.zoom = Vector2.ONE * lerpf(1.08, 1.0, reveal)
+		# Keep the same on-screen player size during the scene transition too.
+		river.camera.zoom = Vector2.ONE
 		river.camera.offset = Vector2(-36.0,-20.0)*(1.0-reveal)
 		river.sound.volume_db = lerpf(-50.0,-29.0,reveal)
 	if time >= RiverTransition.DURATION:
@@ -151,12 +184,12 @@ func _tick_river_transition(delta: float) -> void:
 		river_transition.queue_free()
 		river_transition = null
 
-func _mount_river(cinematic: bool) -> void:
+func _mount_river(cinematic: bool,scene_path: String = "res://scenes/debug/c_zone_river.tscn") -> void:
 	active_controller.leave()
 	art_actor.hide()
 	cavern_foreground.hide()
 	env_fx.hide()
-	river = load("res://scenes/debug/c_zone_river.tscn").instantiate()
+	river = load(scene_path).instantiate()
 	river.hosted_in_level = true
 	add_child(river)
 	queue_redraw()
@@ -198,14 +231,19 @@ func _draw() -> void:
 func _draw_debug_selector() -> void:
 	draw_string(ui_font, Vector2(72.0, 92.0), "INKFALL · DEBUG", HORIZONTAL_ALIGNMENT_LEFT, -1.0, 30, INK)
 	draw_string(ui_font, Vector2(74.0, 128.0), "关卡测试入口", HORIZONTAL_ALIGNMENT_LEFT, -1.0, 16, Color(INK, 0.58))
-	var titles := ["DEBUG · 1-01 · 墨坠井", "DEBUG · 1-02 · 风化绳崖", "DEBUG · 1-03 · 月炉木屋与根下旧矿", "DEMO · 原创场景 · 沉钟雾谷", "DEBUG · C区第二幕 · 枯枝瘴沼", "DEBUG · C区第三幕 · 断桥与升降梯"]
-	var details := ["悬崖井口 → 火焰竖井 → 雾岸渡水 → 枯枝瘴沼", "双崖上层 → 滚石收绳 → 架绳攀爬 → 盾行山洞 → 对岸木屋", "木屋求救声 → 三相结界 → 坠入旧矿 → 绳索与十字镐 → 营救魔法师", "独立场景 → 多平面视差 → 电影景深 → 自由移动", "高台木箱 → 大树秋千 → 毒气石柱 → 落石与喷火", "投石砸断吊桥绳 → 过桥 → 带石上升降梯 → 砸断配重绳 → 升上悬崖"]
-	for index in titles.size():
-		var rect := Rect2(72.0, 145.0 + float(index) * 78.0, 1040.0, 68.0)
+	var titles := ["DEBUG · 1-01 · 墨坠井", "DEBUG · C区第二幕 · 枯枝瘴沼", "DEBUG · C区第三幕 · 断桥与升降梯", "DEBUG · C区第四幕 · 山坡与森林", "章节 1 · 森林至断木斜桥（完整场景）", "DEBUG · 场景 2～6 · 崖下美术巡览", "DEBUG · 场景 2 · 断木斜桥（可玩）", "DEBUG · 场景 2 · 崖间绳梯（可玩）", "章节 1 · 悬崖衔接（测试入口）"]
+	var details := ["悬崖井口 → 火焰竖井 → 雾岸渡水 → 枯枝瘴沼 → 断桥与升降梯 → 森林", "高台木箱 → 大树秋千 → 毒气石柱 → 落石与喷火", "投石砸断吊桥绳 → 过桥 → 带石上升降梯 → 砸断配重绳 → 升上悬崖", "升降梯之上的山坡 → 森林的第一个房间（目前只有美术和绳）", "森林起身 → 崖边演出 → 绳梯下降 → 解锁木桥；暂不衔接 C 区", "旧静态构图参考（非玩法）", "F + 向左拔卡木；空格跳跃；踏桥会受力晃动", "直接从崖顶测试绳梯；W/S 上下爬；空格跳跃", "从森林末端进入悬崖；保留自动行走、墓标与乌鸦；可下梯解锁木桥"]
+	titles[4]="章节 1 · 森林至 C 区（连续试玩）"
+	details[4]="森林起身 → 绳梯 → 木桥 → 双路吊运站 → 落石栈道 → C 区雾岸"
+	titles.append_array(["章节 1 · 双路吊运站（新）","章节 1 · 落石栈道（新）"])
+	details.append_array(["上下两路任选：移板与承重锁止 / 配重吊篮；F 抓握，A/D 操作，空格跳跃","导石入篮改变通路；朽木与摆板连跳；近点复活；出口接 C 区"])
+	var first_visible:=maxi(0,debug_selection-8)
+	for index in range(first_visible,mini(titles.size(),first_visible+9)):
+		var rect := Rect2(72.0, 140.0 + float(index-first_visible) * 54.0, 1040.0, 48.0)
 		var selected := index == debug_selection
 		draw_rect(rect, INK if selected else PAPER); draw_rect(rect, INK, false, 3.0)
-		draw_string(ui_font, rect.position + Vector2(32.0, 29.0), titles[index], HORIZONTAL_ALIGNMENT_LEFT, -1.0, 22, PAPER if selected else INK)
-		draw_string(ui_font, rect.position + Vector2(32.0, 55.0), details[index], HORIZONTAL_ALIGNMENT_LEFT, -1.0, 15, Color(PAPER, 0.7) if selected else Color(INK, 0.62))
+		draw_string(ui_font, rect.position + Vector2(32.0, 22.0), titles[index], HORIZONTAL_ALIGNMENT_LEFT, -1.0, 18, PAPER if selected else INK)
+		draw_string(ui_font, rect.position + Vector2(32.0, 41.0), details[index], HORIZONTAL_ALIGNMENT_LEFT, -1.0, 13, Color(PAPER, 0.7) if selected else Color(INK, 0.62))
 	draw_string(ui_font, Vector2(74.0, 645.0), "↑ ↓ 选择　Enter / F 进入测试", HORIZONTAL_ALIGNMENT_LEFT, -1.0, 18, INK)
 	draw_string(ui_font, Vector2(74.0, 686.0), "游戏中按 Esc 返回 DEBUG", HORIZONTAL_ALIGNMENT_LEFT, -1.0, 15, Color(INK, 0.55))
 
