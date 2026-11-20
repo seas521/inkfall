@@ -152,6 +152,11 @@ uniform bool monochrome = false;
 uniform float texel_scale = 2.6;  // texels per screen pixel (the frames are shrunk about 2.6x on screen)
 uniform float soften = 0.8;  // screen pixels of softness every silhouette gets, so its edge is as soft as the ink around it
 uniform vec3 ink = vec3(0.022, 0.025, 0.025);  // the scene's black is not (0, 0, 0)
+uniform float forest_received_light=0.0;
+uniform sampler2D forest_light_texture : source_color, filter_linear, repeat_disable;
+uniform vec2 forest_light_camera=vec2(0.0);
+uniform float forest_light_clock=0.0;
+#include "res://assets/shaders/valley_light_field.gdshaderinc"
 
 uniform vec2 impact_center=vec2(0.5);
 uniform vec2 impact_radius=vec2(1.0);
@@ -161,7 +166,14 @@ uniform vec2 source_eye = vec2(-1000.0);
 uniform bool source_eye_visible = false;
 uniform sampler2D eye_repair : filter_nearest, repeat_disable;
 varying vec4 actor_tint;
-void vertex(){actor_tint=COLOR;}
+varying vec2 toward_light_local;
+void vertex(){
+ actor_tint=COLOR;
+ vec2 light_direction=normalize(vec2(.62,-.78));
+ vec2 axis_x=MODEL_MATRIX[0].xy;
+ vec2 axis_y=MODEL_MATRIX[1].xy;
+ toward_light_local=vec2(dot(light_direction,axis_x)/max(dot(axis_x,axis_x),.0001),dot(light_direction,axis_y)/max(dot(axis_y,axis_y),.0001));
+}
 vec4 body_sample(vec4 c,float repair,vec2 at,vec2 pixel_size){
  float amber=smoothstep(0.018,0.085,c.r-max(c.g,c.b))*smoothstep(0.05,0.22,c.r);
  // Seedance bakes a neutral white rim around some amber eyes. Remove the
@@ -204,11 +216,32 @@ void fragment() {
 	float repaired = texture(eye_repair,UV).r;
 	COLOR = color * actor_tint * vec4(original.rgb,max(original.a,repaired));
 	COLOR.rgb *= 1.0-repaired;
+	if(forest_received_light>0.0){
+		float illumination=valley_light_luminance(forest_light_texture,SCREEN_UV*vec2(1280.,720.),forest_light_camera,forest_light_clock);
+		float sunlight=smoothstep(.045,.16,illumination)*forest_received_light;
+		// Only the surface facing the upper-right canopy opening catches light.
+		// Evaluate in world pixels so turning and differently cropped clips
+		// cannot reverse the light or change the width of the highlight.
+		vec2 toward=toward_light_local*TEXTURE_PIXEL_SIZE;
+		float outside=texture(TEXTURE,body_uv+toward*.7).a*.65+texture(TEXTURE,body_uv+toward*1.7).a*.35;
+		float inner_rim=smoothstep(0.0,.8,max(color.a-outside,0.0));
+		float received=sunlight*(.010+inner_rim*.21);
+		COLOR.rgb+=vec3(received)*max(original.a,repaired)*actor_tint.rgb;
+	}
 }
 """
 	var material := ShaderMaterial.new()
 	material.shader = shader
 	return material
+
+func set_forest_light(enabled:bool,field:Texture2D,camera:Vector2,time:float)->void:
+	if sprite==null or sprite.material==null:return
+	var mat:=sprite.material as ShaderMaterial
+	mat.set_shader_parameter("forest_received_light",1.0 if enabled else 0.0)
+	if not enabled:return
+	mat.set_shader_parameter("forest_light_texture",field)
+	mat.set_shader_parameter("forest_light_camera",camera)
+	mat.set_shader_parameter("forest_light_clock",time)
 
 # --- clip library -------------------------------------------------------------------------------------
 

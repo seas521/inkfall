@@ -1048,6 +1048,7 @@ func sync(delta: float, new_camera: float, active: bool) -> void:
 	valley_depth.sync(camera_x,view_camera_y,c_depth)
 	valley_near.sync(camera_x,view_camera_y,c_depth)
 	valley_front.sync(camera_x,view_camera_y,c_depth)
+	level.actor.set_forest_light(c_depth and not mine_preview and active,valley_depth.FAR,Vector2(camera_x,view_camera_y),valley_depth.clock)
 	background.visible = not in_forest and not c_depth
 	(atmosphere.material as ShaderMaterial).set_shader_parameter("atmosphere_strength", 0.0 if in_forest or c_depth else 1.0)
 	forest_back.visible = in_forest
