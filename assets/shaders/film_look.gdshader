@@ -12,13 +12,6 @@ uniform float environment_softness : hint_range(0.0, 1.0) = 0.0;
 // actors, grass and procedural props. Exposure remains region-specific.
 uniform float route_softness : hint_range(0.0, 1.0) = 0.0;
 uniform float mine_atmosphere : hint_range(0.0, 1.0) = 0.0;
-// River optics follow the actual shoreline, preserving the accepted softness
-// on dry land and on the character above the waterline.
-uniform float river_clarity = 0.0;
-uniform sampler2D river_bank : filter_linear, repeat_disable;
-uniform vec2 river_origin = vec2(0.0);
-uniform vec2 river_axis_x = vec2(1280.0,0.0);
-uniform vec2 river_axis_y = vec2(0.0,720.0);
 uniform float bloom : hint_range(0.0, 1.0) = 0.24;
 uniform float grain : hint_range(0.0, 0.3) = 0.022;
 uniform float vignette : hint_range(0.0, 1.0) = 0.24;
@@ -63,14 +56,7 @@ void fragment() {
 	vec2 dp = SCREEN_PIXEL_SIZE * resolution_scale;
 	float optical_profile=max(route_softness,mine_atmosphere);
 	float diffusion=max(environment_softness,optical_profile*.88);
-	vec2 world=river_origin+uv.x*river_axis_x+uv.y*river_axis_y;
-	float bed=texture(river_bank,vec2(((world.x+120.0)/4.0+.5)/706.0,.5)).r*1024.0;
-	float water_mask=river_clarity*smoothstep(565.0,582.0,world.y);
-	water_mask*=smoothstep(0.0,10.0,bed-world.y);
-	water_mask*=smoothstep(-120.0,-108.0,world.x)*(1.0-smoothstep(2688.0,2700.0,world.x));
-	float local_profile=mix(optical_profile,0.0,water_mask);
-	float local_diffusion=mix(diffusion,0.0,water_mask);
-	vec2 optical_dp=dp*mix(1.0,1.65,local_diffusion)*mix(1.0,1.45,local_profile);
+	vec2 optical_dp=dp*mix(1.0,1.65,diffusion)*mix(1.0,1.45,optical_profile);
 	vec3 base = tap(uv);
 
 	// Optical diffusion, not a flat blur: retain most of the original exposure and
@@ -82,7 +68,7 @@ void fragment() {
 		soft += tap(uv + d * 1.45 * optical_dp) * 0.07;
 		soft += tap(uv + d * 3.15 * optical_dp) * 0.035;
 	}
-	vec3 col = mix(base, soft, mix(mix(softness,0.90,diffusion),0.30,water_mask));
+	vec3 col = mix(base, soft, mix(softness,0.90,diffusion));
 
 	// Halation: only what is already bright spills over, so the fog glows against the silhouettes.
 	vec3 glow = vec3(0.0);

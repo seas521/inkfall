@@ -28,18 +28,6 @@ func _process(delta:float)->void:
 		if route_owner!=null and not live:
 			mine_target=0.0
 			lens_material.set_shader_parameter("environment_softness",0.0)
-			lens_material.set_shader_parameter("river_clarity",0.0)
-
-func set_river_clarity(enabled:bool,bank:Texture2D,canvas:Transform2D,viewport_size:Vector2)->void:
-	if lens_material==null:return
-	lens_material.set_shader_parameter("river_clarity",1.0 if enabled else 0.0)
-	if not enabled:return
-	var inverse:=canvas.affine_inverse()
-	var origin:=inverse*Vector2.ZERO
-	lens_material.set_shader_parameter("river_bank",bank)
-	lens_material.set_shader_parameter("river_origin",origin)
-	lens_material.set_shader_parameter("river_axis_x",inverse*Vector2(viewport_size.x,0)-origin)
-	lens_material.set_shader_parameter("river_axis_y",inverse*Vector2(0,viewport_size.y)-origin)
 
 func set_environment_softness(amount:float)->void:
 	if lens_material!=null:lens_material.set_shader_parameter("environment_softness",clampf(amount,0,1))
