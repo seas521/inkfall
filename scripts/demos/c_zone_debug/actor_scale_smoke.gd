@@ -21,8 +21,7 @@ func _measure(label: String) -> void:
 	var actor = level.actor
 	_check(is_equal_approx(actor.pose.visual_scale, Pose.HOOD_VISUAL_SCALE), label+": shared gameplay scale")
 	_check(level.camera.zoom.is_equal_approx(Vector2.ONE), label+": camera at 1:1")
-	# Remove breathing phase and action posture from the comparison.
-	actor.breath_ramp = 0.0
+	# Remove action posture from the comparison.
 	actor.squash = 1.0
 	actor.play(&"idle_left", 0)
 	actor._apply()

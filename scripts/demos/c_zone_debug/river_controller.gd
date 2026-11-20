@@ -23,6 +23,12 @@ const WORLD_MIN_X := Scene1Act.START_X - 13.0 - 525.0  # Left edge of the wake-u
 const PLAYER_SIZE := Vector2(26, 54)
 const ACTOR_VISUAL_SCALE := Pose.HOOD_VISUAL_SCALE
 const CRATE_SIZE := Vector2(144, 32)
+# Shared with the visible near hull: water contacts must follow its curved
+# bow/stern rather than the rectangular movement collider.
+const BOAT_HULL_PROFILE := [
+	Vector2(-5,-6),Vector2(8,-3),Vector2(36,-1),Vector2(72,0),Vector2(108,-1),Vector2(136,-3),Vector2(149,-6),
+	Vector2(150,10),Vector2(133,27),Vector2(101,34),Vector2(72,35),Vector2(43,34),Vector2(11,27),Vector2(-6,10)
+]
 const CRATE_START := Vector2(422, 518)
 const FAN_SPOT := Vector2(495, 292)
 const RACK_RECT := Rect2(363, 414, 209, 10)
@@ -132,9 +138,9 @@ const ROCK_RESIST_RAMP := 0.15  # s to dig in
 var hosted_in_level := false
 var cinematic_entry := false
 var LEFT_PROFILE := PackedVector2Array([
-	Vector2(-120, 320), Vector2(5, 365), Vector2(225, 550),
+	Vector2(-520, 280), Vector2(-360, 292), Vector2(-220, 306), Vector2(-120, 320), Vector2(5, 365), Vector2(225, 550),
 	Vector2(1090, 550), Vector2(1180, 584), Vector2(1270, 630),
-	Vector2(1350, 850), Vector2(-120, 850)
+	Vector2(1350, 850), Vector2(-520, 850)
 ])
 var RIGHT_PROFILE := PackedVector2Array([
 	Vector2(1880, 850), Vector2(1950, 625), Vector2(2110, 550),
@@ -297,6 +303,8 @@ var pause_panel: Control
 var sound: AudioStreamPlayer
 
 func _ready() -> void:
+	# Direct chapter/debug entry must use the same lens as the menu-launched game.
+	preload("res://scripts/effects/film_look.gd").attach(self)
 	RenderingServer.set_default_clear_color(Color("979797"))
 	_create_ground(LEFT_PROFILE)
 	_create_ground(RIGHT_PROFILE)
@@ -1177,8 +1185,12 @@ func _apply_fan_wind() -> void:
 	wind_impulses += 1
 
 func ground_y(x: float) -> float:
+	if x <= -120.0:
+		return lerpf(280.0,320.0,clampf((x+520.0)/400.0,0.0,1.0))
+	if x <= 5.0:
+		return lerpf(320.0,365.0,(x+120.0)/125.0)
 	if x <= 225.0:
-		return 365.0 + (x - 5.0) * 185.0 / 220.0
+		return lerpf(365.0,550.0,(x-5.0)/220.0)
 	if x <= 1090.0:
 		return 550.0
 	if x <= 1180.0:
@@ -1229,14 +1241,24 @@ func _lowest_crate_y() -> float:
 func crate_waterline_span() -> Vector2:
 	var half := CRATE_SIZE * 0.5
 	var corners := PackedVector2Array()
-	for point in [Vector2(-half.x, -half.y), Vector2(half.x, -half.y), half, Vector2(-half.x, half.y)]:
-		corners.append(crate.position + half + point.rotated(crate_tilt))
+	for point in BOAT_HULL_PROFILE:
+		corners.append(crate.position + half + (point-half).rotated(crate_tilt))
 	var crossings: Array[float] = []
-	for i in 4:
+	for i in corners.size():
 		var a := corners[i]
-		var b := corners[(i + 1) % 4]
-		if (a.y <= WATER_Y and b.y > WATER_Y) or (b.y <= WATER_Y and a.y > WATER_Y):
-			crossings.append(lerpf(a.x, b.x, (WATER_Y - a.y) / (b.y - a.y)))
+		var b := corners[(i + 1) % corners.size()]
+		var da:float=a.y-art.water_line(a.x)
+		var db:float=b.y-art.water_line(b.x)
+		if (da<=0.0 and db>0.0) or (db<=0.0 and da>0.0):
+			# Refine against the live swell, including when the hull is tilted.
+			var low:=0.0
+			var high:=1.0
+			for step in 10:
+				var mid:=(low+high)*0.5
+				var p:=a.lerp(b,mid)
+				if (p.y-art.water_line(p.x)>0.0)==(da>0.0):low=mid
+				else:high=mid
+			crossings.append(lerpf(a.x,b.x,(low+high)*0.5))
 	if crossings.size() < 2:
 		return Vector2(crate.position.x + half.x, crate.position.x + half.x)
 	crossings.sort()
@@ -1855,6 +1877,13 @@ func _update_marsh_checkpoint() -> void:
 	if checkpoint >= 4 or not player.is_on_floor():
 		return
 	var feet_x := player.position.x + PLAYER_SIZE.x * 0.5
+	# Reaching this solid bank is sufficient, including arrivals from the
+	# mine route where the old raft-completion flag may still be unset.
+	# Never send a failed swinging-deck jump back across the river.
+	var bank_feet_y:=player.position.y+PLAYER_SIZE.y
+	if checkpoint<3 and feet_x>MARSH_LEDGE_SAVE_X and feet_x<SECOND_ACT_LEDGE.position.x+520.0 and absf(bank_feet_y-SECOND_ACT_LEDGE.position.y)<8.0:
+		checkpoint=2
+		marsh_save=maxi(marsh_save,1)
 	# Inside the second act, before the mid-act save: remember how far in the player has got.
 	if checkpoint == 2:
 		var feet_y := player.position.y + PLAYER_SIZE.y
@@ -1887,7 +1916,7 @@ func _retire_fan_for_second_act() -> void:
 	checkpoint_fan = false
 	fan_left_behind = true
 
-func _update_player(delta: float, direction: float, crate_speed: float) -> void:
+func _update_player(delta: float, direction: float, crate_speed: float, air_target:float=INF, air_control_acceleration:float=210.0, ground_speed_cap:float=INF) -> void:
 	var grounded := player.is_on_floor() or is_riding()
 	coyote = 0.11 if grounded else maxf(0.0, coyote - delta)
 	jump_buffer = maxf(0.0, jump_buffer - delta)
@@ -1903,7 +1932,9 @@ func _update_player(delta: float, direction: float, crate_speed: float) -> void:
 	elif scene1.in_pond():
 		speed *= 0.62  # wading through a shallow pond in scene 1
 	if scene1.low_stance!=null and scene1.low_stance.active():speed=minf(speed,scene1.Crevice.low_speed(player.position.x+13) if player.position.y< -3900 else scene1.LowStance.SPEED)
+	if grounded:speed=minf(speed,ground_speed_cap)
 	var target := direction * speed
+	if not grounded and is_finite(air_target):target=air_target
 	_update_rope_mode(delta, direction)
 	if entry_brake:
 		target = 0.0
@@ -1917,7 +1948,7 @@ func _update_player(delta: float, direction: float, crate_speed: float) -> void:
 		var box_speed := puzzle_box_motion / maxf(delta, 0.0001)
 		target = box_speed + clampf((puzzle_box_grip_target_x() - player.position.x) * 16.0, -105.0, 105.0)
 	if intro_time <= 0.0:
-		var accel := 1900.0
+		var accel := air_control_acceleration if not grounded and is_finite(air_target) else 1900.0
 		if grounded and direction != 0.0 and rock_shove_index < 0 and not dragging and not puzzle_box_dragging and not hang_player_on and not in_shallows \
 				and player.velocity.x * direction > -1.0 and absf(target) > absf(player.velocity.x):
 			accel = Pose.HOOD_START_ACCEL  # the first step shows before he is at speed (no sliding on the spot)
@@ -1944,7 +1975,19 @@ func _update_player(delta: float, direction: float, crate_speed: float) -> void:
 	var jump_cut := -595.0 * jump_scale * Pose.HOOD_JUMP_CUT
 	if not Input.is_action_pressed("jump") and player.velocity.y < jump_cut:
 		player.velocity.y = jump_cut
+	if grounded and is_finite(ground_speed_cap) and player.velocity.y> -120.0 and jump_windup_left<=0:
+		# On the mine stair, the old vertical gravity impulse was projected
+		# downhill every tick and consumed the boy's gentle start acceleration.
+		# Travel tangent to the actual support with a small inward bias; jump
+		# launch/air motion and every uncapped region retain normal gravity.
+		var support_normal:=player.get_floor_normal()
+		if support_normal.y<-.5:
+			player.velocity.y=player.velocity.x*(-support_normal.x/support_normal.y)+4.0
 	player.move_and_slide()
+	if grounded and is_finite(ground_speed_cap) and jump_windup_left<=0 and player.velocity.y> -120.0 and not player.is_on_floor():
+		# At the stair's rounded crest the old tangent points above the next
+		# support. Snap only this grounded, capped walk; never a launched jump.
+		player.apply_floor_snap()
 	player.position.x = clampf(player.position.x, WORLD_MIN_X + 20.0, WORLD_WIDTH - 55.0)
 
 # --- climbing ------------------------------------------------------------------------------------------
@@ -2085,6 +2128,10 @@ func _find_ledge(side: float, pressing: bool) -> bool:
 		offset += step
 	if collider == null:
 		return false
+	var descent_route=get("bridge_to_c")
+	if descent_route!=null and descent_route.active and descent_route.MOUTH_ONLY:
+		if not collider.has_meta("cliff_handhold"):return false
+		if int(collider.get_meta("cliff_handhold_step",-1))<descent_route.last_step and not Input.is_action_pressed("climb_up"):return false
 	if found.y > feet_y - CLIMB_MIN_HEIGHT:
 		return false
 	# a ledge only a little above the floor he left is landed on (unless he has dropped well below it since)
@@ -2092,7 +2139,7 @@ func _find_ledge(side: float, pressing: bool) -> bool:
 		return false
 	# the rope-hung deck is the one moving platform he can take hold of (unloaded it hangs still); the swing, the bridge
 	# and the lift move too much, the raft is not land
-	if (collider is AnimatableBody2D and collider != hang_body) or (collider is CharacterBody2D and collider != puzzle_box):
+	if (collider is AnimatableBody2D and collider != hang_body and not collider.has_meta("cliff_handhold")) or (collider is CharacterBody2D and collider != puzzle_box):
 		return false
 	# the face under the edge must really be a wall (a slope is walked): the edge is a corner, nothing solid just inside it
 	var below := _climb_ray(Vector2(found.x - side * 5.0, found.y + 6.0), Vector2(found.x - side * 5.0, found.y + 30.0))

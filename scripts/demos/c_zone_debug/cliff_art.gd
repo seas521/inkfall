@@ -56,10 +56,16 @@ static func _draw_cliff_mass(art) -> void:
 	outline.append(Vector2(Cliff.CLIFF_X - 6.0, Cliff.DOCK_Y + 14.0))
 	outline.append(Vector2(Cliff.CLIFF_X - 4.0, Cliff.DOCK_Y + 3.0))
 	var x := Cliff.CLIFF_X
-	while x < Cliff.WORLD_END + 120.0:
+	# The camera can see beyond the gameplay ramp's end. Continue its
+	# buried rock past the actual world boundary instead of exposing a
+	# rectangular window into the backdrop under the last slope segment.
+	var right_extent:=maxf(Cliff.WORLD_END+120.0,art.level.WORLD_WIDTH+256.0)
+	while x < right_extent:
 		outline.append(Vector2(x, _ramp_y(x) - 1.4 + art.noise.get_noise_1d(x * 1.1 + 900.0) * 2.0 + art.noise.get_noise_1d(x * 4.0) * 0.8))
 		x += 6.0
-	outline.append(Vector2(Cliff.WORLD_END + 120.0, 980.0))
+	outline.append(Vector2(right_extent,_ramp_y(right_extent)))
+	outline.append(Vector2(right_extent, 2000.0))
+	outline.append(Vector2(Cliff.CLIFF_X-60.0,2000.0))
 	land.draw_colored_polygon(outline, INK)
 	# Dead roots grow out of the ledges and the lip and hang down over the fog.
 	for spec in [Vector2(356.0, 90.0), Vector2(292.0, 120.0), Vector2(214.0, 110.0), Vector2(150.0, 100.0), Vector2(60.0, 120.0), Vector2(-20.0, 90.0), Vector2(-96.0, 130.0), Vector2(-170.0, 100.0), Vector2(-246.0, 120.0), Vector2(Cliff.DOCK_Y + 14.0, 110.0)]:

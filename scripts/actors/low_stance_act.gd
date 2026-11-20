@@ -12,6 +12,15 @@ var mode:=Mode.UP
 var time:=0.0
 var distance:=0.0
 var last_x:=0.0
+var down_consumed:=false
+func consume_ladder_down()->void:
+	reset()
+	down_consumed=Input.is_action_pressed("climb_down")
+func crouch_requested()->bool:
+	if not Input.is_action_pressed("climb_down"):
+		down_consumed=false
+		return false
+	return not down_consumed
 func _init(owner):level=owner
 func active()->bool:return mode!=Mode.UP
 func transitioning()->bool:return mode in [Mode.ENTER,Mode.EXIT]

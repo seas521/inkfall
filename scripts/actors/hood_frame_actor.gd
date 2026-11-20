@@ -29,7 +29,6 @@ const CARRY_RUN_SPEED := 285.0
 # Above this speed a jump is a running jump (the run-up and landing clips of the run); his run is 78 px/s, so the old 120 never
 # applied: every jump on the move used the standing set.
 const RUN_AIR_SPEED := 45.0
-const BREATH_RAMP_TIME := 0.8
 const RUNNING_CLIPS := [&"tired_start", &"tired_run", &"small_run_l1"]
 const TAKEOFF_TIME := 0.125
 const LANDING_CANCEL_TIME := 0.08
@@ -51,6 +50,12 @@ const TIRED_STOP_FROM := 8.0  # the stagger clip is entered this many frames in 
 const KNOCKDOWN_STAGGER_FRAMES := 42  # fall_air after this turns into a flying dive, which is too airborne for a bat hit
 
 var pose
+var heavy_walk_distance:=0.0
+var heavy_walk_last_feet:=Vector2.ZERO
+var heavy_walk_track_valid:=false
+var heavy_walk_facing:=1.0
+var heavy_was_moving:=false
+var heavy_item:Sprite2D
 var body: Node2D
 var sprite: Sprite2D
 var eye_light:Node2D
@@ -72,9 +77,9 @@ var land_clip: StringName = &"clumsy_stand_land"
 # Walking about: idle -> start -> run -> stop -> tired idle -> idle. The clips follow what the player does and never hold the
 # controls up: movement, turning and jumping are the controller's, at once; every clip below can be cut short at any frame
 # (the table-picked frame of the next clip, and a short cross-fade, hide the change).
+const STATIC_REST_CLIPS := [&"idle_left", &"small_hold", &"big_hold", &"hug_hold", &"low_idle", &"grip_hold", &"tired_idle"]
 var loco: StringName = &"idle"
 var run_time := 0.0
-var breath_ramp := 1.0
 var prev_windup := -1.0  # the gathering for a jump of the last frame (pose.jump_windup)
 var windup_set := "stand"
 var windup_from := 0
@@ -92,9 +97,6 @@ var squash := 1.0  # 1 = as he is; smaller = flattened under something heavy (se
 # Running: he leans into it, head forward, like someone who has been running too long (the clip itself is a clean sprint).
 const RUN_LEAN := 0.13  # rad
 var run_lean := 0.0
-const BREATH_DEPTH := 0.011  # share of his height: about a pixel
-const BREATH_RATE := 2.3  # rad/s: a breath every 2.7 s
-var breath_time := 0.0
 # A collision can flip his speed between 0 and walking speed every frame (the boat sliding away under a held key): the
 # run clip is kept for this long after the last real movement instead of flickering with the idle.
 const RUN_HOLD_TIME := 0.12
@@ -114,6 +116,10 @@ func _ready() -> void:
 		refresh = 60.0
 	body = Node2D.new()
 	add_child(body)
+	heavy_item=Sprite2D.new();heavy_item.centered=false;heavy_item.z_index=-1
+	heavy_item.texture_filter=CanvasItem.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS
+	heavy_item.draw.connect(func():preload("res://scripts/chapters/mine_cart_chock_art.gd").draw_stone(heavy_item,Vector2.ZERO))
+	heavy_item.hide();body.add_child(heavy_item)
 	sprite = Sprite2D.new()
 	sprite.centered = false
 	sprite.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS  # shrunk 2.6x: without mipmaps the edges shimmer as he moves by a fraction of a pixel
@@ -349,9 +355,7 @@ func sync_pose(delta: float, next_pose) -> void:
 		var wanted := _choose_clip()
 		if wanted != current_clip or (not playing and bool(Manifest.CLIPS[String(wanted)]["loop"])):
 			if wanted != current_clip:
-				_begin_ghost(_blend_time(current_clip, wanted), current_clip in [&"climb",&"rope_ladder"])
-				if (current_clip == &"climb" or current_clip == &"run_stop") and wanted == &"idle_left":
-					breath_ramp = 0.0  # the idle's breathing comes in gently, not at full depth on the first frame
+				_begin_ghost(_blend_time(current_clip, wanted), current_clip in [&"climb",&"rope_ladder",&"rope_swing",&"rope_climb",&"rope_climb_up"])
 			play(wanted, pending_from)
 			pending_from = 0
 		if wanted == &"tired_run":
@@ -362,11 +366,6 @@ func sync_pose(delta: float, next_pose) -> void:
 			anim_speed = 1.0
 		var before_index := current_frame_index
 		_advance(dt)
-		if current_clip == &"idle_left":
-			# The recorded idle is still for most of its length and then twitches (the hood tip): on a still picture that
-			# reads as the figure jerking every second. He stands still and breathes instead (see _apply).
-			progress = 0.0
-			current_frame_index = 0
 		if pose.grounded and FOOT_CONTACTS.has(current_clip):
 			_count_footsteps(before_index, current_frame_index)
 	else:
@@ -392,9 +391,12 @@ func sync_pose(delta: float, next_pose) -> void:
 			current_frame_index = clampi(int(progress), 0, count - 1)
 			playing = false
 		else:
-			anim_speed = 1.0
+			anim_speed = float(action.get("speed",1.0))
 			_advance(dt)
 		action_driven = true
+	# All settled rest states use a fixed silhouette: no breathing loop or scale.
+	if current_clip in STATIC_REST_CLIPS:
+		progress=0.0;current_frame_index=0
 	body_lift = FALL_CENTRE if current_clip == &"fall_loop" else 0.0
 	_apply()
 	previous_action = pose.action
@@ -403,6 +405,36 @@ func sync_pose(delta: float, next_pose) -> void:
 	previous_vertical_speed = pose.velocity.y
 
 func _action_frame() -> Dictionary:
+	if pose.small_item_kind in [&"mine_heavy",&"heavy"]:
+		var heavy_clip:StringName=&"hug_hold"
+		match pose.action:
+			ActorPoseState.ACTION_PICKUP:heavy_clip=&"hug_pickup"
+			ActorPoseState.ACTION_THROW_CHARGE:heavy_clip=&"hug_throw_charge"
+			ActorPoseState.ACTION_THROW_RELEASE:heavy_clip=&"hug_throw_release"
+			&"heavy_recover":heavy_clip=&"hug_recover"
+			_:heavy_clip=&"hug_hold"
+		var travelled:=0.0
+		if heavy_walk_track_valid:
+			var step:=absf(pose.feet.x-heavy_walk_last_feet.x)
+			if step<20:travelled=step
+		heavy_walk_last_feet=pose.feet;heavy_walk_track_valid=true
+		if pose.action==ActorPoseState.ACTION_NONE:
+			if absf(pose.velocity.x)>1.5 and travelled>.002:
+				if not heavy_was_moving or pose.facing!=heavy_walk_facing:heavy_walk_distance=0
+				heavy_was_moving=true;heavy_walk_facing=pose.facing
+				heavy_walk_distance+=travelled
+				var entry:Dictionary=Manifest.CLIPS["hug_walk_enter"]
+				var entry_length:float=entry["travel_distance"]
+				if heavy_walk_distance<entry_length:
+					return {"clip":&"hug_walk_enter","frame":heavy_walk_distance/entry_length*float(entry["frames"]-1)}
+				var gait:Dictionary=Manifest.CLIPS["hug_walk"]
+				var phase:float=fposmod(heavy_walk_distance-entry_length,float(gait["travel_distance"]))/float(gait["travel_distance"])
+				return {"clip":&"hug_walk","frame":phase*float(gait["frames"])}
+			else:heavy_was_moving=false;heavy_walk_distance=0
+		else:heavy_was_moving=false;heavy_walk_distance=0
+		if has_clip(heavy_clip):
+			if pose.action==ActorPoseState.ACTION_NONE:return {"clip":heavy_clip}
+			return {"clip":heavy_clip,"progress":pose.action_progress}
 	# Gathering for a jump: the takeoff clip, by the controller's progress
 	if pose.jump_windup >= 0.0 and pose.grounded and pose.action == ActorPoseState.ACTION_NONE:
 		var gather_clip := StringName("clumsy_%s_takeoff" % windup_set)
@@ -544,13 +576,9 @@ func _apply() -> void:
 	# controller marks those phases with clip_flip_h (the previous actor's clips faced the other way).
 	var face: float = 1.0 if pose.clip_flip_h else float(pose.facing)
 	body.scale = Vector2(-face * scale_value, scale_value)
-	breath_time += last_dt
 	var lean_target := RUN_LEAN if current_clip == &"small_run_l1" else 0.0
 	run_lean = move_toward(run_lean, lean_target, 0.9 * maxf(last_dt, 0.0))
 	body.rotation = face * run_lean
-	if current_clip == &"idle_left" or current_clip == &"small_hold":
-		breath_ramp = minf(1.0, breath_ramp + last_dt / BREATH_RAMP_TIME)
-		body.scale.y *= 1.0 + BREATH_DEPTH * breath_ramp * sin(breath_time * BREATH_RATE)
 	if squash < 0.999:
 		body.scale = Vector2(body.scale.x * (1.0 + (1.0 - squash) * 0.5), body.scale.y * squash)
 	if ghost_time > 0.0:
@@ -559,6 +587,8 @@ func _apply() -> void:
 		if ghost_time <= 0.0:
 			ghost.hide()
 	body.position = Vector2(0.0, -body_lift * scale_value) + body_offset
+	if data.has("gait_root_offsets"):
+		body.position.x+=-face*scale_value*float(data["gait_root_offsets"][current_frame_index])
 	position = pose.feet
 	var fade := 1.0
 	if pose.failure_time > 0.0:
@@ -576,12 +606,19 @@ func _apply() -> void:
 		material.set_shader_parameter("source_eye",(Vector2(float(eye_track[0]),float(eye_track[1]))-sprite.position)/Vector2(sprite.texture.get_size()))
 	eye_light.sync_eye(eyes[current_frame_index] if current_frame_index<eyes.size() else [],pose.monochrome,pose.fog_blur)
 	_update_item(scale_value)
+	heavy_item.visible=pose.small_item_kind==&"mine_heavy" and pose.held>=0 and String(clip).begins_with("hug_") and data.has("hold_points")
+	if heavy_item.visible:
+		# The same rigid silhouette is used on the ground, in the arms and in flight.
+		heavy_item.texture=null
+		heavy_item.position=hand_local()+pose.heavy_item_offset
+		heavy_item.scale=Vector2.ONE/maxf(scale_value,.01)
+		heavy_item.queue_redraw()
 
 # --- the item in his hand ---------------------------------------------------------------------------
 
 func _update_item(scale_value: float) -> void:
 	var kind: StringName = pose.small_item_kind
-	if kind == &"fan":
+	if kind in [&"fan",&"torch",&"mine_heavy",&"heavy"]:
 		item_node.hide()  # the controller draws the fan, from hand_local() / the rod
 		return
 	var clip := String(current_clip)

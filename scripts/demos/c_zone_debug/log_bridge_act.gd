@@ -68,6 +68,8 @@ var pin_body: RigidBody2D
 var sounds := {}
 var exit_shoulder:StaticBody2D
 var exit_open:=false
+var bank_bodies:Array[StaticBody2D]=[]
+var mine_geometry:=false
 
 func _ready() -> void:
 	_bank(LEFT)
@@ -133,7 +135,18 @@ func _bank(rect: Rect2) -> StaticBody2D:
 	shape.position = rect.get_center()
 	body.add_child(shape)
 	add_child(body)
+	bank_bodies.append(body)
 	return body
+
+func set_mine_geometry(enabled:bool)->void:
+	mine_geometry=enabled
+	# The mine route owns its short landing as well as the alternating steps.
+	# Leaving the long bridge bank active creates invisible ground over the gap.
+	for i in bank_bodies.size():
+		bank_bodies[i].collision_layer=0 if enabled else 1
+	log_body.collision_layer=0 if enabled else 1
+	pin_body.collision_layer=0 if enabled else 16
+	art.visible=not enabled
 
 func set_exit_open(enabled:bool)->void:
 	exit_open=enabled
@@ -231,7 +244,15 @@ func respawn() -> void:
 		# than finishing a long vertical pan after the picture has reopened.
 		_snap_follow_camera()
 	else:
-		level.player.position = (ORIGIN+Vector2(875,555) if reached_bank else ORIGIN+Vector2(180,400))-Vector2(13,56)
+		var mine:Node2D=level.get("bridge_to_c") if mine_geometry else null
+		if mine!=null:
+			# The old bridge bank extends into what is now open air. Respawn
+			# on the authored short ladder landing, not its archived coordinates.
+			mine.checkpoint_step=-1
+			mine.restore_checkpoint()
+			mine.active=false # this death timeline owns the remaining reveal
+		else:
+			level.player.position = (ORIGIN+Vector2(875,555) if reached_bank else ORIGIN+Vector2(180,400))-Vector2(13,56)
 	level.player.velocity = Vector2.ZERO
 	level.facing = 1.0
 	level.jump_buffer = 0.0

@@ -1,0 +1,21 @@
+{
+  "design_size": [
+    1671,
+    941
+  ],
+  "origin": [
+    -665,
+    -3545
+  ],
+  "render_size": [
+    3342,
+    1882
+  ],
+  "camera_elevation_radians": 0.1,
+  "layers": [
+    "depth",
+    "structure",
+    "foreground"
+  ],
+  "material_policy": "No color textures; geometry, shadows, diffuse light and subtle face separation"
+}

@@ -14,3 +14,6 @@ __pycache__/
 /artifacts/forest-art/
 /artifacts/scale/
 /artifacts/scene1/
+# Local captures, extracted frames and rollback snapshots; tracked history stays intact.
+/artifacts/
+*.blend1

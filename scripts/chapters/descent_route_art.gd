@@ -90,7 +90,7 @@ void fragment(){
 func sync(delta:float,enabled:bool)->void:
 	clock+=delta
 	camera=Vector2(route.level.camera_x,route.level.camera_y)
-	var preview:bool=not route.in_c_zone and route.level.player.position.y< -2900 and route.level.player.position.x> -2850 and route.level.player.position.x<50
+	var preview:bool=route.active and not route.in_c_zone and route.level.player.position.y< -2900 and route.level.player.position.x> -2850 and route.level.player.position.x<50
 	var exit_visible:bool=route.in_c_zone and route.feet().x<2000
 	visible=enabled or preview or exit_visible
 	drawing.visible=enabled or preview or exit_visible

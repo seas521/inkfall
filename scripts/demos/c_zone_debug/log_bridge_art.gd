@@ -173,7 +173,16 @@ func _stage(parent: Node, radius: float, ink: bool) -> Dictionary:
 	parent.add_child(output)
 	return {"view":view,"root":root,"output":output}
 
+func sync_destination(origin:Vector2, elapsed:float) -> void:
+	# This plate is reparented into the landmark viewport. Its transform must
+	# update with the cabin even when the old bridge geometry is disabled.
+	depth.material.set_shader_parameter("camera",origin-puzzle.ORIGIN)
+	depth.material.set_shader_parameter("clock",elapsed)
+	depth.material.set_shader_parameter("opacity",1.0)
+	depth.modulate=Color.WHITE
+
 func sync(delta: float, origin: Vector2, enabled: bool) -> void:
+	enabled = enabled and not puzzle.mine_geometry
 	visible = enabled
 	back.visible = enabled
 	front.visible = enabled

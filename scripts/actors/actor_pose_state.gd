@@ -2,6 +2,7 @@ extends RefCounted
 
 const STYLE_HOOD: StringName = &"hood"  # the hooded boy (hood_frame_actor.gd)
 const HOOD_RUN_SPEED_SCALE := 0.4737  # his run speed against the level's RUN_SPEED (285 px/s): 135 px/s (the recorded jog moves its feet at 78: the loop plays 1.25x, see HOOD_RUN_ANIM_SPEED)
+const HEAVY_CARRY_SPEED := 36.0  # Shared heavy carry pace; gait remains distance-driven.
 const HOOD_AIR_SPEED_SCALE := 0.8  # in the air he can go a little faster (a lunge), so a jump still gets across the gap
 const HOOD_JUMP_CUT := 0.78  # letting go of the key early cuts the jump to this share of the launch speed: a tap still hops about 40 px (the full jump is 65)
 const HOOD_JUMP_WINDUP := 0.09  # s: pressing jump gathers him first (the video's crouch), then he leaves the ground: the jump has weight
@@ -66,6 +67,7 @@ var impact := 0.0
 var light_exposure := 0.0
 var combo_index := 0
 var small_item_kind: StringName = &""
+var heavy_item_offset:=Vector2.ZERO # registered held volume offset in actor body space
 var small_item_radius := 8.0
 var small_item_origin := Vector2(-9999.0, -9999.0)  # screen position where the item lay before it was picked up
 # Shared gameplay size. Scene composition must not resize the player.

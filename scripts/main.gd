@@ -15,7 +15,7 @@ const SCREEN := Palette.SCREEN
 const PLAYER_SIZE := Palette.PLAYER_SIZE
 const INK := Palette.INK
 const PAPER := Palette.PAPER
-# The DEBUG menu: 0 = 1-01 (the surface, the shaft, then the C zone), 1 to 3 = the C zone's later acts started directly.
+# Stable internal IDs retained for existing test tools; public entries are listed below.
 const MARSH_DEBUG_INDEX := 1
 const CLIFF_DEBUG_INDEX := 2
 const FOREST_DEBUG_INDEX := 3
@@ -26,20 +26,31 @@ const ROPE_LADDER_DEBUG_INDEX := 7
 const CLIFF_ENTRY_DEBUG_INDEX := 8
 const STATION_DEBUG_INDEX := 9
 const SCREE_DEBUG_INDEX := 10
-const MAX_DEBUG_INDEX := 10
+const ROOT_CLIFF_DEBUG_INDEX := 11
+const VALLEY_ENTRY_DEBUG_INDEX := 17
+const MAX_DEBUG_INDEX := 17
+# Keep stable launch IDs for stored scenes and old standalone test tools.
+# Only these three gameplay entries are exposed in either menu.
+const DEBUG_ENTRIES := [
+	{"id":SCENE1_DEBUG_INDEX,"title":"第一章 · 完整版","detail":"上方森林 → 悬崖绳梯 → 崖间树枝 → 矿洞 → 谷底森林"},
+	{"id":ROPE_LADDER_DEBUG_INDEX,"title":"测试 · 悬崖绳梯","detail":"从绳梯顶部进入；可沿第一章路线继续向下游玩"},
+	{"id":VALLEY_ENTRY_DEBUG_INDEX,"title":"测试 · 谷底森林入口","detail":"从矿洞出口进入谷底森林；保留矿洞与森林的往返衔接"},
+]
 const CHAPTER_ROUTE := "res://scenes/chapters/chapter_01_route.tscn"
 const DEBUG_RETURN_META := &"inkfall_debug_return"
 const RiverTransition = preload("res://scripts/levels/level01_river_transition.gd")
 const FilmLook = preload("res://scripts/effects/film_look.gd")
 
 @export_category("DEBUG")
-@export_enum("运行时关卡菜单", "1-01 · 墨坠井", "C区第二幕 · 枯枝瘴沼", "C区第三幕 · 断桥与升降梯", "C区第四幕 · 山坡与森林", "章节 1 · 森林至 C 区（连续试玩）", "场景 2～6 · 崖下美术巡览", "场景 2 · 断木斜桥（玩法）", "场景 2 · 崖间绳梯（玩法）", "章节 1 · 悬崖衔接（测试）", "章节 1 · 双路吊运站（新）", "章节 1 · 落石栈道（新）")
+@export_enum("运行时关卡菜单:0", "第一章 · 完整版:5", "测试 · 悬崖绳梯:8", "测试 · 谷底森林入口:18")
 var debug_start_level: int = 0
 
 var game_context = GameContext.new()
 var ui_font: Font
 var debug_selector_open := true
-var debug_selection := 0
+var debug_selection := SCENE1_DEBUG_INDEX
+var menu_layer:CanvasLayer
+var menu_canvas:Node2D
 var art_actor: Node2D
 var env_fx: Node2D
 var cavern_foreground: Node2D
@@ -48,10 +59,14 @@ var level_controllers: Array[Node2D] = []
 var active_controller: Node2D
 var river: Node2D
 var river_transition: CanvasLayer
+var last_window_size := Vector2i.ZERO
+var resize_revision := 0
 
 func _ready() -> void:
 	ui_font = ThemeDB.fallback_font
 	FilmLook.attach(self)
+	last_window_size = get_window().size
+	get_window().size_changed.connect(_on_window_size_changed)
 	level_controllers = [Level01Controller.new(), Level02Controller.new(), Level03Controller.new(), CinematicDepthDemoController.new()]
 	for controller in level_controllers:
 		add_child(controller)
@@ -62,23 +77,51 @@ func _ready() -> void:
 	env_fx = ENV_FX.new(); add_child(env_fx)
 	art_actor = ACTOR_STYLE_HOST.new(); add_child(art_actor)
 	cavern_foreground = CAVERN_FOREGROUND_ART.new(); add_child(cavern_foreground)
+	# Menu labels live above the film pass: gameplay keeps its approved blur,
+	# while the launcher stays readable during repeated test launches.
+	menu_layer=CanvasLayer.new();menu_layer.layer=101;add_child(menu_layer)
+	menu_canvas=Node2D.new();menu_canvas.draw.connect(func():_draw_debug_selector(menu_canvas))
+	menu_layer.add_child(menu_canvas)
 	if get_tree().has_meta(DEBUG_RETURN_META):
-		debug_selection = clampi(int(get_tree().get_meta(DEBUG_RETURN_META)), 0, MAX_DEBUG_INDEX)
+		debug_selection = _menu_selection(int(get_tree().get_meta(DEBUG_RETURN_META)))
 		get_tree().remove_meta(DEBUG_RETURN_META)
 	elif debug_start_level > 0:
-		debug_selection = debug_start_level - 1
+		debug_selection = _menu_selection(debug_start_level - 1)
 		_start_debug_level()
 	queue_redraw()
+
+func _on_window_size_changed() -> void:
+	if DisplayServer.window_get_mode() != DisplayServer.WINDOW_MODE_WINDOWED:
+		return
+	resize_revision += 1
+	var revision := resize_revision
+	get_tree().create_timer(0.16).timeout.connect(func() -> void:
+		if revision == resize_revision:
+			_keep_window_aspect()
+	)
+
+func _keep_window_aspect() -> void:
+	var current := DisplayServer.window_get_size()
+	if current.y <= 0 or absf(float(current.x) / float(current.y) - 16.0 / 9.0) < 0.01:
+		last_window_size = current
+		return
+	var target := current
+	if absi(current.x - last_window_size.x) >= absi(current.y - last_window_size.y):
+		target.y = roundi(float(current.x) * 9.0 / 16.0)
+	else:
+		target.x = roundi(float(current.y) * 16.0 / 9.0)
+	last_window_size = target
+	DisplayServer.window_set_size(target)
 
 func _physics_process(delta: float) -> void:
 	env_fx.call("begin_frame")
 	if debug_selector_open:
 		art_actor.hide()
 		cavern_foreground.hide()
-		if Input.is_action_just_pressed("ui_up"): debug_selection = maxi(0, debug_selection - 1)
-		if Input.is_action_just_pressed("ui_down"): debug_selection = mini(MAX_DEBUG_INDEX, debug_selection + 1)
+		if Input.is_action_just_pressed("ui_up"): _move_menu_selection(-1)
+		if Input.is_action_just_pressed("ui_down"): _move_menu_selection(1)
 		if Input.is_action_just_pressed("ui_accept") or Input.is_action_just_pressed("interact"): _start_debug_level()
-		queue_redraw(); return
+		menu_canvas.queue_redraw();queue_redraw(); return
 	if Input.is_action_just_pressed("ui_cancel"):
 		_show_debug_selector(); return
 	if river_transition != null:
@@ -105,9 +148,23 @@ func _present_controller(delta: float) -> void:
 	else: art_actor.hide()
 	cavern_foreground.call("sync", delta, float(state.get("camera_axis", 0.0)), bool(state.get("cavern_foreground", false)))
 
+func _menu_selection(value:int)->int:
+	for entry in DEBUG_ENTRIES:
+		if entry.id==value:return value
+	return SCENE1_DEBUG_INDEX
+
+func _move_menu_selection(direction:int)->void:
+	var row:=0
+	for i in DEBUG_ENTRIES.size():
+		if DEBUG_ENTRIES[i].id==debug_selection:row=i;break
+	row=clampi(row+direction,0,DEBUG_ENTRIES.size()-1)
+	debug_selection=DEBUG_ENTRIES[row].id
+
 func _show_debug_selector() -> void:
+	debug_selection=_menu_selection(debug_selection)
 	_clear_river()
 	debug_selector_open = true
+	menu_layer.show();menu_canvas.queue_redraw()
 	if active_controller != null: active_controller.leave()
 	active_controller = null
 	art_actor.hide()
@@ -115,7 +172,11 @@ func _show_debug_selector() -> void:
 	queue_redraw()
 
 func _start_debug_level() -> void:
+	if debug_selection==12:
+		get_tree().change_scene_to_file("res://scenes/demos/mine_art_gallery.tscn")
+		return
 	debug_selector_open = false
+	menu_layer.hide()
 	# the menu entries start level 0 (1-01) normally, or level 0's C zone directly at a later act
 	_activate_level(0)
 	match debug_selection:
@@ -137,8 +198,11 @@ func _start_debug_level() -> void:
 			_mount_river(false)
 			river.debug_enter_log_bridge()
 		ROPE_LADDER_DEBUG_INDEX:
-			_mount_river(false)
+			_mount_river(false,CHAPTER_ROUTE)
 			river.debug_enter_rope_ladder(false)
+		VALLEY_ENTRY_DEBUG_INDEX:
+			_mount_river(false,CHAPTER_ROUTE)
+			river.enter_valley_test()
 		CLIFF_ENTRY_DEBUG_INDEX:
 			_mount_river(false,CHAPTER_ROUTE)
 			river.enter_cliff_test()
@@ -148,6 +212,23 @@ func _start_debug_level() -> void:
 		SCREE_DEBUG_INDEX:
 			_mount_river(false,CHAPTER_ROUTE)
 			river.enter_scree_test()
+		16:
+			_mount_river(false,CHAPTER_ROUTE)
+			river.enter_mine_cart_pair_test()
+		15:
+			_mount_river(false,CHAPTER_ROUTE)
+			river.enter_mine_cart_gap_test()
+		14:
+			_mount_river(false,CHAPTER_ROUTE)
+			river.enter_mine_shaft_test()
+		13:
+			_mount_river(false,CHAPTER_ROUTE)
+			river.enter_root_cliff_test()
+			river.bridge_to_c.checkpoint_step=3
+			river.bridge_to_c.restore_checkpoint()
+		ROOT_CLIFF_DEBUG_INDEX:
+			_mount_river(false,CHAPTER_ROUTE)
+			river.enter_root_cliff_test()
 	queue_redraw()
 
 # `index` is the level controller (0 = 1-01; the others are the earlier prototypes the old progression still reaches)
@@ -226,26 +307,20 @@ func _draw() -> void:
 	if river != null:
 		return
 	draw_rect(Rect2(Vector2.ZERO, SCREEN), PAPER)
-	if debug_selector_open: _draw_debug_selector()
 
-func _draw_debug_selector() -> void:
-	draw_string(ui_font, Vector2(72.0, 92.0), "INKFALL · DEBUG", HORIZONTAL_ALIGNMENT_LEFT, -1.0, 30, INK)
-	draw_string(ui_font, Vector2(74.0, 128.0), "关卡测试入口", HORIZONTAL_ALIGNMENT_LEFT, -1.0, 16, Color(INK, 0.58))
-	var titles := ["DEBUG · 1-01 · 墨坠井", "DEBUG · C区第二幕 · 枯枝瘴沼", "DEBUG · C区第三幕 · 断桥与升降梯", "DEBUG · C区第四幕 · 山坡与森林", "章节 1 · 森林至断木斜桥（完整场景）", "DEBUG · 场景 2～6 · 崖下美术巡览", "DEBUG · 场景 2 · 断木斜桥（可玩）", "DEBUG · 场景 2 · 崖间绳梯（可玩）", "章节 1 · 悬崖衔接（测试入口）"]
-	var details := ["悬崖井口 → 火焰竖井 → 雾岸渡水 → 枯枝瘴沼 → 断桥与升降梯 → 森林", "高台木箱 → 大树秋千 → 毒气石柱 → 落石与喷火", "投石砸断吊桥绳 → 过桥 → 带石上升降梯 → 砸断配重绳 → 升上悬崖", "升降梯之上的山坡 → 森林的第一个房间（目前只有美术和绳）", "森林起身 → 崖边演出 → 绳梯下降 → 解锁木桥；暂不衔接 C 区", "旧静态构图参考（非玩法）", "F + 向左拔卡木；空格跳跃；踏桥会受力晃动", "直接从崖顶测试绳梯；W/S 上下爬；空格跳跃", "从森林末端进入悬崖；保留自动行走、墓标与乌鸦；可下梯解锁木桥"]
-	titles[4]="章节 1 · 森林至 C 区（连续试玩）"
-	details[4]="森林起身 → 绳梯 → 木桥 → 双路吊运站 → 落石栈道 → C 区雾岸"
-	titles.append_array(["章节 1 · 双路吊运站（新）","章节 1 · 落石栈道（新）"])
-	details.append_array(["上下两路任选：移板与承重锁止 / 配重吊篮；F 抓握，A/D 操作，空格跳跃","导石入篮改变通路；朽木与摆板连跳；近点复活；出口接 C 区"])
-	var first_visible:=maxi(0,debug_selection-8)
-	for index in range(first_visible,mini(titles.size(),first_visible+9)):
-		var rect := Rect2(72.0, 140.0 + float(index-first_visible) * 54.0, 1040.0, 48.0)
-		var selected := index == debug_selection
-		draw_rect(rect, INK if selected else PAPER); draw_rect(rect, INK, false, 3.0)
-		draw_string(ui_font, rect.position + Vector2(32.0, 22.0), titles[index], HORIZONTAL_ALIGNMENT_LEFT, -1.0, 18, PAPER if selected else INK)
-		draw_string(ui_font, rect.position + Vector2(32.0, 41.0), details[index], HORIZONTAL_ALIGNMENT_LEFT, -1.0, 13, Color(PAPER, 0.7) if selected else Color(INK, 0.62))
-	draw_string(ui_font, Vector2(74.0, 645.0), "↑ ↓ 选择　Enter / F 进入测试", HORIZONTAL_ALIGNMENT_LEFT, -1.0, 18, INK)
-	draw_string(ui_font, Vector2(74.0, 686.0), "游戏中按 Esc 返回 DEBUG", HORIZONTAL_ALIGNMENT_LEFT, -1.0, 15, Color(INK, 0.55))
+
+func _draw_debug_selector(canvas:Node2D) -> void:
+	canvas.draw_string(ui_font, Vector2(72.0, 92.0), "INKFALL · 关卡菜单", HORIZONTAL_ALIGNMENT_LEFT, -1.0, 30, INK)
+	canvas.draw_string(ui_font, Vector2(74.0, 128.0), "第一章与测试入口", HORIZONTAL_ALIGNMENT_LEFT, -1.0, 16, Color(INK, 0.58))
+	for row in DEBUG_ENTRIES.size():
+		var entry:Dictionary=DEBUG_ENTRIES[row]
+		var rect := Rect2(72.0, 160.0 + float(row) * 72.0, 1040.0, 60.0)
+		var selected:bool = entry.id == debug_selection
+		canvas.draw_rect(rect, INK if selected else Color(PAPER,0.28)); canvas.draw_rect(rect, INK, false, 3.0)
+		canvas.draw_string(ui_font, rect.position + Vector2(32.0, 25.0), entry.title, HORIZONTAL_ALIGNMENT_LEFT, -1.0, 20, PAPER if selected else INK)
+		canvas.draw_string(ui_font, rect.position + Vector2(32.0, 47.0), entry.detail, HORIZONTAL_ALIGNMENT_LEFT, -1.0, 14, Color(PAPER, 0.7) if selected else Color(INK, 0.62))
+	canvas.draw_string(ui_font, Vector2(74.0, 645.0), "↑ ↓ 选择　Enter / F 进入关卡", HORIZONTAL_ALIGNMENT_LEFT, -1.0, 18, INK)
+	canvas.draw_string(ui_font, Vector2(74.0, 686.0), "游戏中按 Esc 返回关卡菜单", HORIZONTAL_ALIGNMENT_LEFT, -1.0, 15, Color(INK, 0.55))
 
 func draw_soft_cloud(canvas: Node2D, center: Vector2, size: Vector2, tint: Color) -> void:
 	if art_mist_texture == null:

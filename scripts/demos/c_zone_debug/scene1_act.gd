@@ -436,7 +436,7 @@ func tick_low_stance(delta:float)->void:
 	# Beneath the timber, releasing S retains the pose until there is room to
 	# stand. Everywhere else this remains a normal hold-S crouch.
 	var under_wood:bool=Crevice.in_low_zone(feet.x) and feet.y>Crevice.roof_top(feet.x,Callable())+25
-	var low_wanted:bool=(low_stance.active() and under_wood) or (Input.is_action_pressed("climb_down") and not ladder_mouth)
+	var low_wanted:bool=(low_stance.active() and under_wood) or (low_stance.crouch_requested() and not ladder_mouth)
 	low_stance.tick(delta,low_wanted,low_allowed and level.player.is_on_floor(),Crevice.at_mouth(feet.x))
 
 func tick(delta: float) -> void:
