@@ -8,6 +8,7 @@ func _check(ok:bool,label:String):
 	if not ok:failures+=1
 func _run():
 	var main=MAIN.instantiate()
+	main.debug_start_level=5
 	root.add_child(main)
 	await physics_frame
 	var level=main.river

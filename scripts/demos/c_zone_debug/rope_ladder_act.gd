@@ -111,12 +111,16 @@ func _begin(next: Mode, first: float) -> void:
 
 func mount_top() -> void:
 	var from := feet()
+	if level.log_bridge.mine_geometry:
+		level.log_bridge.left_bank_reached=false
+		level.log_bridge.reached_bank=false
 	level.log_bridge.enter(false)
 	source_origin = from-_track(10,"feet")
 	_begin(Mode.MOUNT,10)
 	swing_speed += 4.0
 
 func catch_from_bank() -> void:
+	if level.log_bridge.mine_geometry:level.log_bridge.left_bank_reached=true
 	level.log_bridge.enter(false)
 	source_origin = feet()-_track(CATCH_FROM,"feet")
 	_begin(Mode.CATCH,CATCH_FROM)
@@ -325,6 +329,9 @@ func _finish_top() -> void:
 	stop()
 	returned_top += 1
 	level.log_bridge.stop()
+	if level.log_bridge.mine_geometry:
+		level.log_bridge.left_bank_reached=false
+		level.log_bridge.reached_bank=false
 	level.checkpoint = 6
 	level.scene1.cut = Scene1.Cut.DONE
 	level.scene1.intro_time = 99

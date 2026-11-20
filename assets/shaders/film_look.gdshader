@@ -7,12 +7,24 @@ render_mode unshaded;
 // values, so every strength here means what it would in a photo editor.
 uniform sampler2D screen_tex : hint_screen_texture, repeat_disable, filter_linear;
 uniform float softness : hint_range(0.0, 1.0) = 0.54;
+uniform float environment_softness : hint_range(0.0, 1.0) = 0.0;
+// One common optical profile covers every gameplay silhouette, including
+// actors, grass and procedural props. Exposure remains region-specific.
+uniform float route_softness : hint_range(0.0, 1.0) = 0.0;
+uniform float mine_atmosphere : hint_range(0.0, 1.0) = 0.0;
+// River optics follow the actual shoreline, preserving the accepted softness
+// on dry land and on the character above the waterline.
+uniform float river_clarity = 0.0;
+uniform sampler2D river_bank : filter_linear, repeat_disable;
+uniform vec2 river_origin = vec2(0.0);
+uniform vec2 river_axis_x = vec2(1280.0,0.0);
+uniform vec2 river_axis_y = vec2(0.0,720.0);
 uniform float bloom : hint_range(0.0, 1.0) = 0.24;
 uniform float grain : hint_range(0.0, 0.3) = 0.022;
-uniform float vignette : hint_range(0.0, 1.0) = 0.32;
+uniform float vignette : hint_range(0.0, 1.0) = 0.24;
 uniform float flicker : hint_range(0.0, 0.1) = 0.012;
 uniform float contrast : hint_range(0.0, 1.0) = 0.12;
-uniform float iris_strength : hint_range(0.0, 1.0) = 0.80;
+uniform float iris_strength : hint_range(0.0, 1.0) = 0.93;
 uniform float scratches : hint_range(0.0, 1.0) = 0.2;
 
 float hash11(float p) {
@@ -32,6 +44,14 @@ vec3 tap(vec2 uv) {
 	return texture(screen_tex, uv).rgb;
 }
 
+float lens_noise(vec2 p) {
+	vec2 cell = floor(p);
+	vec2 f = fract(p);
+	f = f * f * (3.0 - 2.0 * f);
+	return mix(mix(hash21(cell), hash21(cell + vec2(1.0, 0.0)), f.x),
+		mix(hash21(cell + vec2(0.0, 1.0)), hash21(cell + vec2(1.0, 1.0)), f.x), f.y);
+}
+
 void fragment() {
 	vec2 uv = SCREEN_UV;
 	vec2 screen_size = 1.0 / SCREEN_PIXEL_SIZE;
@@ -41,6 +61,16 @@ void fragment() {
 	// scaling keeps the soft photographic envelope without magnifying blockiness.
 	float resolution_scale = sqrt(max(screen_size.x / 1280.0, screen_size.y / 720.0));
 	vec2 dp = SCREEN_PIXEL_SIZE * resolution_scale;
+	float optical_profile=max(route_softness,mine_atmosphere);
+	float diffusion=max(environment_softness,optical_profile*.88);
+	vec2 world=river_origin+uv.x*river_axis_x+uv.y*river_axis_y;
+	float bed=texture(river_bank,vec2(((world.x+120.0)/4.0+.5)/706.0,.5)).r*1024.0;
+	float water_mask=river_clarity*smoothstep(565.0,582.0,world.y);
+	water_mask*=smoothstep(0.0,10.0,bed-world.y);
+	water_mask*=smoothstep(-120.0,-108.0,world.x)*(1.0-smoothstep(2688.0,2700.0,world.x));
+	float local_profile=mix(optical_profile,0.0,water_mask);
+	float local_diffusion=mix(diffusion,0.0,water_mask);
+	vec2 optical_dp=dp*mix(1.0,1.65,local_diffusion)*mix(1.0,1.45,local_profile);
 	vec3 base = tap(uv);
 
 	// Optical diffusion, not a flat blur: retain most of the original exposure and
@@ -49,10 +79,10 @@ void fragment() {
 	for (int i = 0; i < 8; i++) {
 		float a = float(i) * 0.7853982 + 0.4;
 		vec2 d = vec2(cos(a), sin(a));
-		soft += tap(uv + d * 1.45 * dp) * 0.07;
-		soft += tap(uv + d * 3.15 * dp) * 0.035;
+		soft += tap(uv + d * 1.45 * optical_dp) * 0.07;
+		soft += tap(uv + d * 3.15 * optical_dp) * 0.035;
 	}
-	vec3 col = mix(base, soft, softness);
+	vec3 col = mix(base, soft, mix(mix(softness,0.90,diffusion),0.30,water_mask));
 
 	// Halation: only what is already bright spills over, so the fog glows against the silhouettes.
 	vec3 glow = vec3(0.0);
@@ -64,10 +94,14 @@ void fragment() {
 		}
 	}
 	glow /= 30.0;
-	col += glow * bloom * 1.6;
+	col += glow * bloom * 1.6 * mix(1.0,.74,mine_atmosphere);
 
 	// Heavier film contrast: shadows sink, the fog stays creamy.
 	col = mix(col, smoothstep(0.0, 1.0, col), contrast);
+	// Keep luminous bulbs and their brightest pools, while settling the
+	// broad middle grays into the surrounding black mineral silhouettes.
+	vec3 mine_tone=col*mix(vec3(.78),vec3(1.0),smoothstep(vec3(.18),vec3(.68),col));
+	col=mix(col,mine_tone,mine_atmosphere);
 
 	float luma = dot(col, vec3(0.299, 0.587, 0.114));
 	float frame_t = floor(TIME * 24.0);
@@ -85,10 +119,15 @@ void fragment() {
 	float v = smoothstep(0.28, 0.82, length(q) * 1.35);
 	col *= 1.0 - vignette * v;
 
-	// Shared lens enclosure for every gameplay scene, independent of biome.
-	vec2 iris_uv=(uv-vec2(0.49,0.54))/vec2(0.51,0.40);
-	float iris=smoothstep(0.48,1.08,length(iris_uv));
-	col *= 1.0-iris*iris_strength;
+	// Fixed, broad falloff. Vary both its reach and its density so the outer
+	// pixels retain some scene light instead of joining into a solid black frame.
+	vec2 iris_uv=(uv-vec2(0.50,0.52))/vec2(0.54,0.46);
+	float broad=lens_noise(uv*vec2(4.2,3.1)+vec2(2.7,5.4));
+	float fine=lens_noise(uv*vec2(10.0,7.0)+vec2(3.7,8.2));
+	float drift=(broad-0.5)*0.22+(fine-0.5)*0.065;
+	float iris=smoothstep(0.34,1.20,length(iris_uv)+drift);
+	float density=mix(0.70,1.0,broad*0.72+fine*0.28);
+	col *= 1.0-iris*iris_strength*density;
 
 	// Projector flicker.
 	col *= 1.0 + (hash11(floor(TIME * 12.0) + 3.0) - 0.5) * 2.0 * flicker;

@@ -106,8 +106,6 @@ func finish_rope_ladder()->void:
 	grip_offset_x=0.0
 	body_offset=Vector2.ZERO
 	run_lean=0.0
-	breath_ramp=0.0
-	breath_time=0.0
 	climb_exit=0.3
 	ghost_time=0.0
 	ghost.hide()
@@ -116,6 +114,9 @@ func finish_rope_ladder()->void:
 # Rays from the visible sole down to what he stands on give the small drop that puts them on it (the previous actor
 # does the same with surface_contact.gd).
 func apply_surface_contact(delta: float, body: CharacterBody2D, grounded: bool) -> void:
+	if pose.action==&"mine_cart_ride":
+		support_valid=false;support_offset=0
+		return
 	var target := 0.0
 	support_valid = false
 	# Climbing: once he is over the ledge (knees, hands, then feet on it) the picture is sunk onto the surface by the same few pixels
@@ -349,8 +350,55 @@ func _tail_after(finished: StringName) -> Array:
 	return super._tail_after(finished)
 
 func _action_frame() -> Dictionary:
+	if String(pose.action).begins_with("mine_stair_") and Manifest.CLIPS.has(String(pose.action)):
+		load_group("mine_stairs")
+		var name:=String(pose.action)
+		var info:Dictionary=Manifest.CLIPS[name]
+		var canonical:Texture2D=textures["idle_left"][0]
+		var alias_from:int=int(info.frames)-5 if name.ends_with("_exit") else int(info.frames)
+		if name.ends_with("_enter") and textures[name][0]!=canonical:
+			textures[name][0]=canonical
+		if name.ends_with("_exit") and textures[name][int(info.frames)-1]!=canonical:
+			for index in range(alias_from,int(info.frames)):textures[name][index]=canonical
+		return {"clip":pose.action,"frame":pose.action_progress*float(info.frames-1)}
+	if pose.action==&"mine_heavy_putdown":
+		load_group("hug")
+		return {"clip":&"hug_pickup","frame":(1.0-clampf(pose.action_progress,0,1))*float(Manifest.CLIPS["hug_pickup"]["frames"]-1)}
+	if pose.action==&"mine_collapse_stagger":
+		return {"clip": &"flinch", "frame":clampf(pose.action_progress,0,1)*18.0}
+	if pose.action==&"mine_rock_hit":
+		# One continuous part of the source fall: skip the earlier repeated
+		# stumble, then connect the last airborne frame to its actual landing.
+		var t:float=clampf(pose.action_progress,0,1)*1.50
+		if t<.82:return {"clip": &"fall_air", "frame":lerpf(42,87,t/.82)}
+		if t<1.50:return {"clip": &"fall_impact", "frame":lerpf(0,40,(t-.82)/.68)}
+		return {"clip": &"downed", "frame":0.0}
+	if pose.action==&"mine_cart_ride":
+		load_group("low_stance")
+		if pose.action_progress<1:return {"clip": &"low_enter", "progress":pose.action_progress}
+		return {"clip": &"low_idle"}
+	if pose.action==&"rope_climb_up" and has_clip(&"rope_climb_up"):
+		return {"clip": &"rope_climb_up", "frame":pose.action_progress*120.0}
+	if pose.action==&"rope_climb" and has_clip(&"rope_climb"):
+		return {"clip": &"rope_climb", "frame":pose.action_progress*120.0}
+	if pose.action==&"rope_swing" and has_clip(&"rope_swing"):
+		return {"clip": &"rope_swing", "frame":pose.action_progress*240.0}
 	if pose.action == &"rope_ladder" and has_clip(&"rope_ladder"):
 		return {"clip": &"rope_ladder", "frame": pose.action_progress*240.0}
+	if pose.action == &"back_ladder":
+		load_group("back_ladder")
+		return {"clip": &"back_ladder", "frame": pose.action_progress*float(Manifest.CLIPS["back_ladder"]["frames"]-1)}
+	if pose.action == &"mine_ladder_settle":
+		load_group("back_ladder")
+		# Reuse the imported GPU resource, too. Identical PNGs imported with
+		# different compression/mipmap settings are not identical on screen.
+		var canonical:Texture2D=textures["idle_left"][0]
+		if textures["mine_ladder_settle"][15]!=canonical:
+			for index in range(15,20):textures["mine_ladder_settle"][index]=canonical
+		return {"clip": &"mine_ladder_settle", "frame": pose.action_progress*float(Manifest.CLIPS["mine_ladder_settle"]["frames"]-1)}
+	if pose.action == &"back_ladder_up":
+		load_group("back_ladder")
+		return {"clip": &"back_ladder_up", "frame": pose.action_progress*float(Manifest.CLIPS["back_ladder_up"]["frames"]-1)}
 	if pose.action == DROWN_ACTION:
 		return _drown_frame()
 	if pose.alarm and has_clip(&"scared_brake"):
@@ -359,12 +407,14 @@ func _action_frame() -> Dictionary:
 		was_shoved = true
 		movement_clip = &""
 		if current_clip == &"shoved" or (current_clip == &"shoved_in" and not playing):
-			return {"clip": &"shoved"}
+			return {"clip": &"shoved", "speed":clampf(absf(pose.velocity.x)/86.0,.35,2.2)}
 		return {"clip": &"shoved_in"}
 	if was_shoved:
 		# the boulder let go: he straightens up (a jump or a step cancels it)
 		was_shoved = false
-		if has_clip(&"shoved_out") and pose.action == ActorPoseState.ACTION_NONE:
+		if not pose.grounded:
+			on_ground=false;ungrounded_time=AIR_GRACE
+		if has_clip(&"shoved_out") and pose.action == ActorPoseState.ACTION_NONE and pose.grounded and pose.jump_windup<0:
 			tail = [{"clip": &"shoved_out", "from": 0, "to": -1}]
 	if pose.action == &"lever" and has_clip(&"grip_to_pull"):
 		# working the stick: the stroke from the pushing stance to the pulling stance follows the lever

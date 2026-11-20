@@ -367,11 +367,10 @@ func tick(delta:float)->bool:
 	clock+=delta
 	if in_c_zone:return false
 	if not active:
-		if level.log_bridge.reached_bank and feet().x> -2460 and feet().y< -3500:
-			enter(0)
-		else:
-			art.sync(delta,false)
-			return false
+		# The station and scree rooms are retained as standalone DEBUG levels.
+		# Chapter 1's main route is now owned by bridge_to_c_handoff.gd.
+		art.sync(delta,false)
+		return false
 	if failure_time>0:
 		failure_time+=delta
 		if failure_time>=0.9:
