@@ -1360,6 +1360,7 @@ func _build_flames() -> void:
 	for i in range(level.MARSH_FIRE_RECTS.size()):
 		var rect: Rect2 = level.MARSH_FIRE_RECTS[i]
 		var flame := InkFlame.new() as Node2D
+		flame.monochrome = true
 		flame.width = rect.size.x + 26.0
 		flame.height = rect.size.y * 1.7
 		flame.seed_value = i + 7
@@ -1387,9 +1388,9 @@ func _draw_fire() -> void:
 		if strength < 0.05:
 			# Banked coals between bursts.
 			var ember := 0.4 + sin(clock * 5.0 + float(i)) * 0.14
-			_soft(effects, base + Vector2(0.0, -3.0), Vector2(30.0, 12.0), Color(1.0, 0.40, 0.08, ember))
-			effects.draw_circle(base + Vector2(-5.0, -2.0), 1.4, Color(1.0, 0.62, 0.2, ember + 0.2), true, -1.0, true)
-			effects.draw_circle(base + Vector2(4.0, -3.0), 1.2, Color(1.0, 0.55, 0.15, ember + 0.2), true, -1.0, true)
+			_soft(effects, base + Vector2(0.0, -3.0), Vector2(30.0, 12.0), Color(0.54, 0.54, 0.54, ember))
+			effects.draw_circle(base + Vector2(-5.0, -2.0), 1.4, Color(0.69, 0.69, 0.69, ember + 0.2), true, -1.0, true)
+			effects.draw_circle(base + Vector2(4.0, -3.0), 1.2, Color(0.64, 0.64, 0.64, ember + 0.2), true, -1.0, true)
 			continue
 
 # ---------------------------------------------------------------- the breakable limb
