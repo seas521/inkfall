@@ -50,6 +50,7 @@ var raft_front: Node2D
 var bank_grass: Node2D
 var surface: Node2D
 var water_volume: Polygon2D
+var river_bed:Node2D
 var water_impacts: Array[Dictionary] = []
 var water_impact_count := 0
 # The water surface is a row of columns (one every WAVE_DX px) that obeys a damped wave equation: whatever disturbs the water
@@ -313,6 +314,9 @@ void fragment(){
 	terrain.z_index = -2
 	terrain.draw.connect(_draw_terrain)
 	add_child(terrain)
+	river_bed=preload("res://scripts/art/river_bed_art.gd").new()
+	river_bed.z_index=-4
+	add_child(river_bed)
 	valley_near=preload("res://scripts/art/valley_forest_near.gd").new()
 	valley_near.level=level;valley_near.z_index=-3
 	add_child(valley_near);valley_near.hide()
@@ -559,21 +563,26 @@ void fragment() {
 	float clearance = bed - world_position.y;
 	if (clearance <= 0.0) { discard; }
 	float edge_aa = smoothstep(0.0, max(fwidth(world_position.y),0.5), clearance);
-	float distortion = sin(world_position.y * 0.14 + clock * 2.1) * 0.35;
-	distortion += sin(world_position.x * 0.07 - clock * 1.3) * 0.15;
+	float distortion = sin(world_position.y * 0.09 + world_position.x*.013 + clock * 1.1) * 0.48;
+	distortion += sin(world_position.x * 0.045 - clock * 0.8) * 0.22;
 	distortion *= smoothstep(0.0,4.0,clearance);
 	// a moving swell bends what is seen through it, most near the top
 	vec2 bend = vec2(distortion + swell_slope * 30.0 * exp(-depth / 40.0), swell_slope * 7.0 * exp(-depth / 25.0));
 	vec2 refract_uv = SCREEN_UV + bend * SCREEN_PIXEL_SIZE * smoothstep(0.0, 16.0, depth);
 	vec3 submerged = texture(scene_color, refract_uv).rgb;
 	// Retain sharp submerged silhouettes; no blur or rapid milky depth extinction.
-	float transmission = mix(0.90,0.60,smoothstep(0.0,12.0,depth));
-	float water_tone = mix(0.47,0.29,smoothstep(0.0,260.0,depth));
-	vec3 water = mix(vec3(water_tone), submerged * 0.82, transmission);
+	// Beer-Lambert attenuation: shallow water stays transparent; visibility
+	// gradually falls with depth instead of becoming milky after twelve pixels.
+	float transmission = .95*exp(-depth*.0032);
+	float water_tone = mix(.13,.035,smoothstep(0.0,300.0,depth));
+	vec3 water = submerged*transmission + vec3(water_tone)*(1.0-transmission);
 	float world_pixel = SCREEN_PIXEL_SIZE.y / max(fwidth(world_position.y),0.001);
 	vec2 reflected_uv = vec2(refract_uv.x,SCREEN_UV.y-(depth*2.0+wave)*world_pixel);
 	vec3 reflected = texture(scene_color,clamp(reflected_uv,vec2(0.0),vec2(1.0))).rgb;
-	water = mix(water,reflected,0.07*exp(-depth/65.0));
+	// Reflection is confined to the shallow surface, with moving normals.
+	// The water column still reveals its own bed instead of mirrored tree trunks.
+	float reflection=(.045+min(abs(swell_slope)*.16,.045))*exp(-depth/23.0);
+	water = mix(water,reflected,reflection);
 	float surface_band = (1.0-smoothstep(0.0,2.4,depth)) * (0.08+0.03*sin(world_position.x*0.019+clock*0.6));
 	surface_band *= 1.0 + abs(swell_slope) * 7.0 + abs(swell) * 0.12;
 	water = mix(water,vec3(0.63),clamp(surface_band,0.0,0.7));
@@ -1150,6 +1159,7 @@ func sync(delta: float, new_camera: float, active: bool) -> void:
 		landmark_output.material.set_shader_parameter("exposure",1.0)
 		landmark_output.material.set_shader_parameter("valley_shade",descent_shade)
 	water_volume.visible = camera_x < 2750.0
+	river_bed.visible=c_depth and camera_x<2750.0
 	background.position.x = -90.0 - maxf(camera_x, 0.0) * 0.10
 	background.position.y=-95.0-view_camera_y*0.32 if root_context else -95.0
 	(background.material as ShaderMaterial).set_shader_parameter("valley_entry",1.0-smoothstep(-600.0,0.0,view_camera_y) if root_context else 0.0)
