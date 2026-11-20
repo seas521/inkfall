@@ -35,6 +35,8 @@ var mine_preview:=false
 var valley_near:Node2D
 var valley_front:Node2D
 var valley_depth:Node2D
+var valley_player_light:CanvasLayer
+var valley_player_focus:Node
 var background: Sprite2D
 var plates_far:Node2D
 var plates_mid:Node2D
@@ -126,6 +128,10 @@ func _ready() -> void:
 	valley_depth=preload("res://scripts/art/valley_forest_depth.gd").new()
 	back_layer.add_child(valley_depth)
 	valley_depth.hide()
+	valley_player_light=preload("res://scripts/art/valley_player_light.gd").new()
+	add_child(valley_player_light);valley_player_light.setup(level)
+	valley_player_focus=preload("res://scripts/art/valley_player_focus.gd").new()
+	add_child(valley_player_focus);valley_player_focus.setup(level)
 	background = Sprite2D.new()
 	background.centered = false
 	background.texture = BACKGROUND
@@ -1049,6 +1055,8 @@ func sync(delta: float, new_camera: float, active: bool) -> void:
 	valley_near.sync(camera_x,view_camera_y,c_depth)
 	valley_front.sync(camera_x,view_camera_y,c_depth)
 	level.actor.set_forest_light(c_depth and not mine_preview and active,valley_depth.FAR,Vector2(camera_x,view_camera_y),valley_depth.clock)
+	valley_player_light.sync(c_depth and not mine_preview and active,valley_depth.FAR,Vector2(camera_x,view_camera_y),valley_depth.clock)
+	valley_player_focus.sync(c_depth and not mine_preview and active)
 	background.visible = not in_forest and not c_depth
 	(atmosphere.material as ShaderMaterial).set_shader_parameter("atmosphere_strength", 0.0 if in_forest or c_depth else 1.0)
 	forest_back.visible = in_forest

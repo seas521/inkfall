@@ -46,6 +46,8 @@ func run()->void:
    check(route.active and route.failure_time==0,"return does not trigger forest death logic")
   main._show_debug_selector();await frames(3)
   check(main.debug_selector_open and main.debug_selection==entry.id,"cancel returns to the selected visible row")
+  var film=get_nodes_in_group("film_look")[0]
+  check(float(film.lens_material.get_shader_parameter("player_plane_focus"))==0.0,"returning to menu releases gameplay focus")
  main.queue_free();await frames(4)
  for choice in [5,8,18]:
   main=load("res://scenes/main.tscn").instantiate()

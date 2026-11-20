@@ -28,6 +28,16 @@ func _process(delta:float)->void:
 		if route_owner!=null and not live:
 			mine_target=0.0
 			lens_material.set_shader_parameter("environment_softness",0.0)
+			lens_material.set_shader_parameter("player_plane_focus",0.0)
+
+func set_player_plane_focus(enabled:bool,coverage:Texture2D,centre:Vector2)->void:
+	if lens_material==null:return
+	lens_material.set_shader_parameter("player_plane_focus",1.0 if enabled else 0.0)
+	if not enabled:
+		lens_material.set_shader_parameter("player_coverage",null)
+		return
+	lens_material.set_shader_parameter("player_coverage",coverage)
+	lens_material.set_shader_parameter("player_focus_center",centre)
 
 func set_environment_softness(amount:float)->void:
 	if lens_material!=null:lens_material.set_shader_parameter("environment_softness",clampf(amount,0,1))

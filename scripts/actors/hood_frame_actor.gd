@@ -167,8 +167,10 @@ uniform bool source_eye_visible = false;
 uniform sampler2D eye_repair : filter_nearest, repeat_disable;
 varying vec4 actor_tint;
 varying vec2 toward_light_local;
+varying vec2 forest_world_position;
 void vertex(){
  actor_tint=COLOR;
+ forest_world_position=(MODEL_MATRIX*vec4(VERTEX,0.0,1.0)).xy;
  vec2 light_direction=normalize(vec2(.62,-.78));
  vec2 axis_x=MODEL_MATRIX[0].xy;
  vec2 axis_y=MODEL_MATRIX[1].xy;
@@ -217,15 +219,14 @@ void fragment() {
 	COLOR = color * actor_tint * vec4(original.rgb,max(original.a,repaired));
 	COLOR.rgb *= 1.0-repaired;
 	if(forest_received_light>0.0){
-		float illumination=valley_light_luminance(forest_light_texture,SCREEN_UV*vec2(1280.,720.),forest_light_camera,forest_light_clock);
-		float sunlight=smoothstep(.045,.16,illumination)*forest_received_light;
+		float sunlight=valley_player_sunlight(forest_light_texture,SCREEN_UV*vec2(1280.,720.),forest_light_camera,forest_light_clock,forest_world_position)*forest_received_light;
 		// Only the surface facing the upper-right canopy opening catches light.
 		// Evaluate in world pixels so turning and differently cropped clips
 		// cannot reverse the light or change the width of the highlight.
 		vec2 toward=toward_light_local*TEXTURE_PIXEL_SIZE;
 		float outside=texture(TEXTURE,body_uv+toward*.7).a*.65+texture(TEXTURE,body_uv+toward*1.7).a*.35;
 		float inner_rim=smoothstep(0.0,.8,max(color.a-outside,0.0));
-		float received=sunlight*(.010+inner_rim*.21);
+		float received=sunlight*(.002+inner_rim*.09);
 		COLOR.rgb+=vec3(received)*max(original.a,repaired)*actor_tint.rgb;
 	}
 }

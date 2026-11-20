@@ -8,10 +8,13 @@ render_mode unshaded;
 uniform sampler2D screen_tex : hint_screen_texture, repeat_disable, filter_linear;
 uniform float softness : hint_range(0.0, 1.0) = 0.54;
 uniform float environment_softness : hint_range(0.0, 1.0) = 0.0;
-// One common optical profile covers every gameplay silhouette, including
-// actors, grass and procedural props. Exposure remains region-specific.
+// Common baseline for the route. C's nearby gameplay silhouettes can reduce
+// diffusion through their actual coverage; exposure remains region-specific.
 uniform float route_softness : hint_range(0.0, 1.0) = 0.0;
 uniform float mine_atmosphere : hint_range(0.0, 1.0) = 0.0;
+uniform float player_plane_focus=0.0;
+uniform sampler2D player_coverage : filter_linear,repeat_disable;
+uniform vec2 player_focus_center=vec2(.5,.65);
 uniform float bloom : hint_range(0.0, 1.0) = 0.24;
 uniform float grain : hint_range(0.0, 0.3) = 0.022;
 uniform float vignette : hint_range(0.0, 1.0) = 0.24;
@@ -57,6 +60,20 @@ void fragment() {
 	float optical_profile=max(route_softness,mine_atmosphere);
 	float diffusion=max(environment_softness,optical_profile*.88);
 	vec2 optical_dp=dp*mix(1.0,1.65,diffusion)*mix(1.0,1.45,optical_profile);
+	float near_focus=0.0;
+	if(player_plane_focus>0.0){
+		// Coverage comes from actual gameplay silhouettes, not background
+		// luminance: the distant trees remain soft even behind the player.
+		vec2 edge=vec2(2.5/1280.0,2.5/720.0);
+		float coverage=texture(player_coverage,uv).a;
+		coverage=max(coverage,texture(player_coverage,uv+vec2(edge.x,0)).a);
+		coverage=max(coverage,texture(player_coverage,uv-vec2(edge.x,0)).a);
+		coverage=max(coverage,texture(player_coverage,uv+vec2(0,edge.y)).a);
+		coverage=max(coverage,texture(player_coverage,uv-vec2(0,edge.y)).a);
+		float reach=length((uv-player_focus_center)/vec2(.36,.30));
+		near_focus=player_plane_focus*smoothstep(.08,.8,coverage)*(1.0-smoothstep(.15,1.0,reach));
+		optical_dp=mix(optical_dp,dp*.72,near_focus);
+	}
 	vec3 base = tap(uv);
 
 	// Optical diffusion, not a flat blur: retain most of the original exposure and
@@ -68,7 +85,7 @@ void fragment() {
 		soft += tap(uv + d * 1.45 * optical_dp) * 0.07;
 		soft += tap(uv + d * 3.15 * optical_dp) * 0.035;
 	}
-	vec3 col = mix(base, soft, mix(softness,0.90,diffusion));
+	vec3 col = mix(base, soft, mix(mix(softness,0.90,diffusion),.36,near_focus));
 
 	// Halation: only what is already bright spills over, so the fog glows against the silhouettes.
 	vec3 glow = vec3(0.0);

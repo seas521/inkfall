@@ -15,3 +15,15 @@ float valley_light_luminance(sampler2D field,vec2 p,vec2 camera,float time_value
  l*=1.-smoothstep(.02,.25,l)*haze*.065;
  return min(l*1.22,.7);
 }
+
+// Player-plane breakup follows the same projected opening, with broad gaps
+// fixed in the world. Three taps suffice for this already defocused light map.
+float valley_player_sunlight(sampler2D field,vec2 p,vec2 camera,float time_value,vec2 world){
+ vec2 q=vec2((p.x+1250.+camera.x*.105)/2780.,(p.y+110.+camera.y*.12)/927.);
+ q.x=valley_mirror(q.x);q.y=clamp(q.y,0.,1.);
+ vec2 d=vec2(1.5)/vec2(2172,724);
+ vec3 c=texture(field,q).rgb*.5+(texture(field,q+d).rgb+texture(field,q-d).rgb)*.25;
+ float strength=smoothstep(.052,.175,dot(c,vec3(.299,.587,.114))*1.22);
+ float opening=valley_noise(vec2((world.x+world.y*.795)*.017,world.y*.004)+vec2(time_value*.012,0));
+ return strength*mix(.30,1.0,smoothstep(.24,.76,opening));
+}
