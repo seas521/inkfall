@@ -1197,6 +1197,7 @@ func sync(delta: float, new_camera: float, active: bool) -> void:
 	crate_art.rotation = level.crate_tilt
 	raft_front.transform = crate_art.transform
 	(water_volume.material as ShaderMaterial).set_shader_parameter("clock", clock)
+	river_bed.set_water(wave_texture,clock)
 	_update_waves(delta)
 	for i in range(water_impacts.size() - 1, -1, -1):
 		water_impacts[i].age += delta
