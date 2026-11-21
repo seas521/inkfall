@@ -245,8 +245,10 @@ func restore_checkpoint() -> void:
 	if mine_trial!=null and mine_trial.gap!=null and mine_trial.gap.art!=null:mine_trial.gap.art.pair_room.ladders.cancel()
 	if mine_trial!=null:mine_trial.cancel_operation()
 	var relay_home:Variant=null
-	if mine_trial!=null and mine_trial.gap!=null and mine_trial.gap.art.pair_room.relay.checkpoint_active and not shaft_preview:
-		relay_home=mine_trial.gap.art.pair_room.relay.restore_attempt()
+	if mine_trial!=null and mine_trial.gap!=null and not shaft_preview:
+		var relay=mine_trial.gap.art.pair_room.relay
+		if relay.arrival_checkpoint:relay_home=relay.restore_arrival()
+		elif relay.checkpoint_active:relay_home=relay.restore_attempt()
 	var mine_home:Variant=relay_home if relay_home!=null else (mine_trial.restore_attempt() if mine_trial!=null and not shaft_preview else null)
 	failure_close=-1.0
 	respawn_reveal=0.0
@@ -275,7 +277,7 @@ func restore_checkpoint() -> void:
 	if checkpoint_step==MOUTH_STEP: home=Vector2(STEPS[MOUTH_STEP].x,mine_floor_y(STEPS[MOUTH_STEP].x))
 	elif checkpoint_step>=0: home.y=Geometry.surface_y(ledges[checkpoint_step],home.x)
 	else: home.y=Geometry.surface_y(landing,home.x)
-	if mine_home!=null and checkpoint_step==MOUTH_STEP:home=mine_home
+	if relay_home!=null or (mine_home!=null and checkpoint_step==MOUTH_STEP):home=mine_home
 	level.player.position = home - Vector2(13, 55)
 	if shaft_preview and shaft!=null:shaft.respawn()
 	level.player.velocity = Vector2.ZERO
@@ -644,6 +646,9 @@ func _sync_death_iris()->void:
 	if respawn_reveal>0:
 		amount=smoothstep(0.0,0.45,respawn_reveal)
 		center=feet()-Vector2(level.camera_x,level.camera_y)-Vector2(0,27)
+	# Stored death centres use the controller's nominal camera window. Map
+	# that world point through the optical pullback before closing the iris.
+	center=(level.get_canvas_transform()*(Vector2(level.camera_x,level.camera_y)+center))/level.get_viewport_rect().size*Vector2(1280,720)
 	level.iris.set_state(amount,center)
 
 func _reach_c_zone_at(at:Vector2)->void:

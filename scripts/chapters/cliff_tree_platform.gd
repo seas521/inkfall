@@ -49,6 +49,7 @@ const BREAK_OUTLINE:=[
  Vector2(350,500),Vector2(0,520)]
 
 func build(which:int,at:Vector2)->void:
+	add_to_group(&"chapter_gameplay_focus")
 	index=which
 	size_factor=0.75 if which==1 else 0.65
 	position=at

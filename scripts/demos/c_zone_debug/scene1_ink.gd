@@ -505,8 +505,9 @@ static func draw_fog(art) -> void:
 	var fog: Node2D = art.fog
 	# Forest air is lit behind the trunks in the background material. Do not
 	# wash the roots and water with a foreground ground-following white ribbon.
-	var view_from: float = float(art.camera_x) - 200.0
-	var view_to: float = float(art.camera_x) + 1480.0
+	var half_width:float=640./minf(art.level.camera.zoom.x,1.)
+	var view_from: float = float(art.camera_x)+640.-half_width-200.0
+	var view_to: float = float(art.camera_x)+640.+half_width+200.0
 	# the ground's own shadow: dark just above its edge, fading upwards (the edge is not a cut line against the fog)
 	var gx: float = maxf(Scene1.START_X - 1300.0, floorf(view_from / 20.0) * 20.0)
 	while gx < minf(Scene1.edge_x() - 20.0, view_to):

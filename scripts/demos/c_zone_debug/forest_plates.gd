@@ -43,6 +43,23 @@ void fragment() {
 	COLOR = vec4(ink.rgb, (1.0-smoothstep(0.20,0.80,l))*source.a*strength*support);
 }"""
 
+# Foreground is an opaque black silhouette. Only the authored alpha contour
+# is sampled; bark/root luminance must not become visible surface texture.
+const VOLUME_SHADER := """shader_type canvas_item;
+render_mode unshaded;
+uniform float strength=1.0;
+uniform vec2 view_padding=vec2(0.0);
+uniform float ground_limit=1000000.0;
+uniform vec4 silhouette : source_color=vec4(.012,.012,.012,1.0);
+void fragment(){
+ float alpha=texture(TEXTURE,UV).a;
+ float support=1.0-smoothstep(ground_limit-90.0,ground_limit,FRAGCOORD.x-view_padding.x);
+ COLOR=vec4(silhouette.rgb,smoothstep(.06,.97,alpha)*strength*support);
+}
+"""
+const VOLUME_ATLAS=preload("res://assets/art/c_zone_debug/forest/foreground-trunks-volume-v57.png")
+var volume_trees:Array[AtlasTexture]=[]
+
 # flat black silhouettes on white (generated): [texture, scale]
 const MID_PLATES := [
 	[preload("res://assets/art/c_zone_debug/forest/forest_optical_giants_v4.png"), 0.80],
@@ -58,7 +75,9 @@ const NEAR_PLATES := [
 ]
 const INITIAL_TRUNK=preload("res://assets/art/c_zone_debug/forest/initial-foreground-trunk-v1.png")
 
+var framing_margin:=0.0
 var initial_index:=-10
+var opening_camera_x:=INF
 var root_guard:Callable
 var root_ground:Callable
 var ground_reference:=-4300.0
@@ -81,7 +100,12 @@ func setup(new_kind:StringName,new_parallax:float,new_spacing:float,new_size:flo
 		var source_size:Vector2=close_texture.atlas.get_size()
 		close_texture.region=Rect2(0,0,source_size.x*0.31,source_size.y)
 		close_texture.filter_clip=true
-	var shader:=Shader.new();shader.code=KEY_SHADER if kind==&"near" else MUL_SHADER
+	if kind==&"near":
+		for column in 2:
+			var atlas:=AtlasTexture.new();atlas.atlas=VOLUME_ATLAS
+			atlas.region=Rect2(column*768,0,768,1024);atlas.filter_clip=true
+			volume_trees.append(atlas)
+	var shader:=Shader.new();shader.code=VOLUME_SHADER if kind==&"near" else MUL_SHADER
 	for i in 5:
 		var sprite:=Sprite2D.new();sprite.centered=false
 		sprite.texture_filter=CanvasItem.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS
@@ -96,7 +120,7 @@ func setup(new_kind:StringName,new_parallax:float,new_spacing:float,new_size:flo
 func set_fade(value:float)->void:
 	fade=clampf(value,0,1);visible=fade>.01
 	for sprite in sprites:
-		if kind==&"near":sprite.modulate.a=fade
+		if kind==&"near":sprite.modulate.a=1.0
 		(sprite.material as ShaderMaterial).set_shader_parameter("strength",fade if kind==&"near" else fade*base_strength)
 
 func set_ground_limit(value:float)->void:
@@ -104,11 +128,15 @@ func set_ground_limit(value:float)->void:
 	for sprite in sprites:(sprite.material as ShaderMaterial).set_shader_parameter("ground_limit",value)
 
 func sync(camera_x:float,ground_y:float,u_max:float)->void:
-	var first:=int(floor(camera_x*parallax/spacing))-2
+	var first:=int(floor((camera_x*parallax-framing_margin)/spacing))-2
 	for k in sprites.size():
 		var i:=first+k;var sprite:=sprites[k]
 		var rng:=RandomNumberGenerator.new();rng.seed=i*9973+(7 if kind==&"near" else (13 if kind==&"far" else 3))
 		var u:=i*spacing+rng.randf_range(0,spacing*.25)
+		# Fixed authored placement: the opening trunk frames the LEFT edge,
+		# not the sleeping boy. It stays opaque and does not follow/fade for him.
+		if kind==&"near" and i==initial_index+1 and is_finite(opening_camera_x):
+			u=opening_camera_x*parallax-60.0
 		var present:=rng.randf()<(.95 if kind==&"near" else 1.0)
 		if kind==&"near" and root_guard.is_valid():
 			if not allowed_roots.has(i):allowed_roots[i]=root_guard.call(u/parallax-320,u/parallax+1280*(1-1/parallax)+320)
@@ -116,8 +144,7 @@ func sync(camera_x:float,ground_y:float,u_max:float)->void:
 		var texture:Texture2D
 		var extra:=1.0
 		if kind==&"near":
-			texture=NEAR_PLATES[rng.randi()%NEAR_PLATES.size()]
-			if i==initial_index:texture=INITIAL_TRUNK
+			texture=volume_trees[posmod(i,volume_trees.size())]
 		else:
 			var entry:Array=MID_PLATES[rng.randi()%MID_PLATES.size()]
 			texture=entry[0];extra=entry[1]
@@ -129,10 +156,10 @@ func sync(camera_x:float,ground_y:float,u_max:float)->void:
 		var flip:=rng.randf()<.5
 		var factor:float=(plate_width/texture.get_height() if kind==&"near" else plate_width/texture.get_width())*rng.randf_range(.92,1.12)*extra
 		# An interior view of cropped giants; no vertical squash to show crowns.
+		if kind!=&"near":factor=maxf(factor,1000.0/texture.get_height())
 		var plate_scale:=Vector2.ONE*factor
-		if kind!=&"near":plate_scale.y=maxf(plate_scale.y,1000.0/texture.get_height())
 		var display:=texture.get_size()*plate_scale;var x:=u-camera_x*parallax
-		sprite.visible=present and u<=u_max and x> -display.x and x<1280+display.x*.2
+		sprite.visible=present and u<=u_max and x> -display.x-framing_margin and x<1280+framing_margin+display.x*.2
 		if not sprite.visible:continue
 		sprite.texture=texture;sprite.flip_h=flip;sprite.scale=plate_scale
 		if kind==&"near":

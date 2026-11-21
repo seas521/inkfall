@@ -19,7 +19,9 @@ func _ready()->void:
   for x in range(int(start_x)-70,int(end_x)+71,16):
    var y:float=ground.call(x);low=minf(low,y);high=maxf(high,y)
   var bounds:=Rect2(Vector2(start_x-70,low-110),Vector2(end_x-start_x+140,high-low+130))
-  Softness.node(self,source,bounds,.85 if near else .65,7 if near else 3).name="near_understory" if near else "rooted_grass_and_ferns"
+  var layer:=Softness.node(self,source,bounds,.85 if near else .65,7 if near else 3)
+  layer.name="near_understory" if near else "rooted_grass_and_ferns"
+  if not near:layer.add_to_group(&"chapter_gameplay_focus")
 func _grass(canvas:Node2D,near:bool)->void:
  var rng:=RandomNumberGenerator.new();rng.seed=25031 if near else 25017
  var x:=start_x+8.0

@@ -361,7 +361,10 @@ func _update_art() -> void:
 	# Camera lead exposes the cliff before the player enters its interaction
 	# radius. Warm the ladder viewport offscreen, including its full drop.
 	var origin:=Vector2(level.camera_x,level.camera_y)
-	var camera_bounds:=Rect2(origin,Vector2(1280,720)).grow(256.0)
+	var inverse:Transform2D=level.get_canvas_transform().affine_inverse()
+	var upper_left:Vector2=inverse*Vector2.ZERO
+	var lower_right:Vector2=inverse*level.get_viewport_rect().size
+	var camera_bounds:=Rect2(upper_left,lower_right-upper_left).grow(256.0)
 	var ladder_bounds:=Rect2(anchor()-Vector2(140,16),Vector2(280,length()+40))
 	art_visible = not level.descent.enabled and (level.log_bridge.active or camera_bounds.intersects(ladder_bounds))
 	art.sync(origin,art_visible)

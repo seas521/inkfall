@@ -5,6 +5,7 @@ const Fan = preload("res://scripts/demos/c_zone_debug/fan_art.gd")
 const CrookedTree = preload("res://scripts/demos/c_zone_debug/crooked_tree_art.gd")
 const LIGHT = preload("res://assets/shaders/cinematic_light_cone.gdshader")
 const SCREEN := Vector2(1280, 720)
+const FOREST_NEAR_PAD := Vector2(336,192)
 const DESTINATION_FIRE_UV := Vector2(0.884,0.447)
 const DESTINATION_INK := 0.22
 const DESTINATION_TREE = preload("res://assets/art/descent/rope-ladder/destination-yard-tree-v2.png")
@@ -35,8 +36,10 @@ var mine_preview:=false
 var valley_near:Node2D
 var valley_front:Node2D
 var valley_depth:Node2D
+var water_cove:Node2D
 var valley_player_light:CanvasLayer
 var valley_player_focus:Node
+var forest_integration:CanvasLayer
 var background: Sprite2D
 var plates_far:Node2D
 var plates_mid:Node2D
@@ -70,6 +73,9 @@ var wave_damp := PackedFloat32Array()
 var wave_kicks: Array[Dictionary] = []
 var wave_texture: ImageTexture
 var wave_energy := 0.0
+var boat_foam: Polygon2D
+var boat_immersion:ShaderMaterial
+var water_prepared:=false
 const WAKE_BOW := 1.1  # px/s of swell added per second per px/s of the raft's speed
 const HULL_PRESS := 1.5
 const HULL_TIP := 120.0
@@ -104,6 +110,7 @@ var _grass_edge_weights:=PackedFloat32Array()
 var _grass_weight_origin:=0.0
 const GRASS_WEIGHT_STEP:=2.0
 var grass_band: Node2D
+var contact_grass:Node2D
 var weather_art: Node2D  # scene 1's cliff: rain, blown leaves, dust (screen space, over the world, under the lens)
 var bat_flock: Node2D  # level 1's flock, for the scene 1 cliff
 var crevice_art:Node2D
@@ -128,10 +135,14 @@ func _ready() -> void:
 	valley_depth=preload("res://scripts/art/valley_forest_depth.gd").new()
 	back_layer.add_child(valley_depth)
 	valley_depth.hide()
+	water_cove=preload("res://scripts/art/river_cove_art.gd").new()
+	add_child(water_cove);water_cove.setup(self,back_layer)
 	valley_player_light=preload("res://scripts/art/valley_player_light.gd").new()
 	add_child(valley_player_light);valley_player_light.setup(level)
 	valley_player_focus=preload("res://scripts/art/valley_player_focus.gd").new()
 	add_child(valley_player_focus);valley_player_focus.setup(level)
+	forest_integration=preload("res://scripts/art/forest_environment_integration.gd").new()
+	add_child(forest_integration);forest_integration.setup(level)
 	background = Sprite2D.new()
 	background.centered = false
 	background.texture = BACKGROUND
@@ -348,6 +359,16 @@ void fragment(){
 	bank_grass.draw.connect(_draw_bank_grass)
 	add_child(bank_grass)
 	_build_water_volume()
+	boat_immersion=ShaderMaterial.new();boat_immersion.shader=Shader.new()
+	boat_immersion.shader.code="""shader_type canvas_item;
+render_mode unshaded;
+uniform float immersed=0.;
+uniform float water_y=575.;
+varying float world_y;
+void vertex(){world_y=(MODEL_MATRIX*vec4(VERTEX,0.,1.)).y;}
+void fragment(){COLOR.a*=1.-immersed*smoothstep(water_y-1.,water_y+34.,world_y);}
+"""
+	crate_art.material=boat_immersion;raft_front.material=boat_immersion
 	fan_pickup = Fan.new()
 	fan_pickup.position = level.FAN_SPOT + Vector2(0, -10)
 	fan_pickup.rotation = 0.48
@@ -387,15 +408,19 @@ void fragment() {
 	var front_layer := CanvasLayer.new()
 	front_layer.layer = 15
 	add_child(front_layer)
-	near_view = _blur_layer(front_layer, 9.0)
+	near_view = _blur_layer(front_layer, 4.0, FOREST_NEAR_PAD)
 	near_blur_sprite = near_view.get_meta(&"output_sprite") as Sprite2D
-	(near_blur_sprite.material as ShaderMaterial).set_shader_parameter("window", 0.9)
+	(near_blur_sprite.material as ShaderMaterial).set_shader_parameter("window", 0.0)
 	plates_near = ForestPlates.new()
-	plates_near.setup(&"near", 1.45, 1500.0, 1500.0)
+	plates_near.setup(&"near", 1.22, 1500.0, 1120.0)
 	plates_near.root_guard=Callable(self,"_near_tree_land_range")
 	plates_near.root_ground=Callable(level.scene1,"ground_top")
-	plates_near.initial_index=int(floor((Scene1Ref.START_X-525.0)*1.45/1500.0))
-	near_view.add_child(plates_near)
+	plates_near.initial_index=int(floor((Scene1Ref.START_X-525.0)*1.22/1500.0))
+	plates_near.opening_camera_x=Scene1Ref.START_X-525.0
+	near_view.get_meta(&"draw_root").add_child(plates_near)
+	plates_near.framing_margin=FOREST_NEAR_PAD.x
+	for foreground_tree in plates_near.sprites:
+		(foreground_tree.material as ShaderMaterial).set_shader_parameter("view_padding",FOREST_NEAR_PAD)
 	fore_view = _blur_layer(front_layer, 6.0)
 	fore_blur_sprite = fore_view.get_meta(&"output_sprite") as Sprite2D
 	foreground = Node2D.new()
@@ -412,7 +437,8 @@ void fragment() {
 	valley_tree.material=valley_ink;mid_view.add_child(valley_tree)
 	grass_band = Node2D.new()  # the low, solid mat the blades grow out of (see _draw_grass_band)
 	grass_band.draw.connect(_draw_grass_band)
-	front_layer.add_child(grass_band)
+	grass_band.z_index=7
+	add_child(grass_band)
 	grass_art = Node2D.new()
 	grass_art.draw.connect(_draw_ground_grass)
 	var grass_material := ShaderMaterial.new()
@@ -420,7 +446,10 @@ void fragment() {
 	grass_shader.code = GRASS_SLICE_SHADER
 	grass_material.shader = grass_shader
 	grass_art.material = grass_material
-	front_layer.add_child(grass_art)
+	grass_art.z_index=7
+	add_child(grass_art)
+	contact_grass=preload("res://scripts/art/valley_contact_grass.gd").new()
+	add_child(contact_grass);contact_grass.setup(self,grass_shader);contact_grass.hide()
 	lens = ColorRect.new()
 	lens.size = SCREEN
 	lens.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -464,14 +493,24 @@ func _draw_weather() -> void:
 # The ground grass is drawn in slices of a strip image (eleven slices in the image's width). A slice ends in a straight vertical line, so
 # every slice fades out at its two sides (fract(UV.x * 11) is where we are in a slice): where two overlap, the grass goes on without a cut.
 const GRASS_SLICE_SHADER := """shader_type canvas_item;
+#include "res://assets/shaders/chapter_surface_response.gdshaderinc"
 uniform vec4 ink : source_color = vec4(0.012, 0.013, 0.013, 1.0);
 uniform float camera_x = 0.0;
+uniform float source_softness = 1.8;
+uniform float blade_sway = 0.0;
 varying float patch_alpha;
-void vertex(){patch_alpha=COLOR.a;}
+varying vec2 grass_world;
+void vertex(){
+ patch_alpha=COLOR.a;
+ float tip=clamp((.80-UV.y)/.22,0.0,1.0);
+ VERTEX.x+=(sin(VERTEX.x*.017+TIME*.9)*.9+sin(VERTEX.x*.043-TIME*1.3)*.5)*tip*tip*blade_sway;
+ grass_world=(MODEL_MATRIX*vec4(VERTEX,0.0,1.0)).xy;
+}
 void fragment() {
-	// The cliff shares the forest's optical grass. Do not fade this kernel
-	// to zero near the clearing: that exposed sharp, hair-thin source blades.
-	float radius=3.5+2.0*smoothstep(0.3,0.8,SCREEN_UV.y);
+	// Grounded grass belongs to the playing plane. Keep a small source
+	// antialias envelope; depth and final diffusion belong to the lens.
+	// Screen Y is not depth, and must not refocus blades when the camera pans.
+	float radius=source_softness;
 	float sum=0.0;
 	float total=0.0;
 	for(int y=-2;y<=2;y++){
@@ -484,7 +523,7 @@ void fragment() {
 	float l=sum/total;
 	float f = fract(UV.x * 11.0);
 	float side = smoothstep(0.02, 0.30, f) * (1.0 - smoothstep(0.70, 0.98, f));
-	COLOR = vec4(ink.rgb, (1.0-l) * side * patch_alpha);
+	COLOR = vec4(ink.rgb+vec3(chapter_surface_light(grass_world)), (1.0-l) * side * patch_alpha);
 }
 """
 
@@ -530,71 +569,64 @@ func _build_scene1_props() -> void:
 		sprite.scale = Vector2(scale_factor, boulder_scale_y) if boulder_scale_y > 0.0 else Vector2.ONE * scale_factor
 		sprite.position = pos
 		sprite.z_index = 0
+		sprite.add_to_group(&"chapter_gameplay_focus")
 		add_child(sprite)
 
 func _build_water_volume() -> void:
 	water_volume = Polygon2D.new()
-	water_volume.z_index = 8
+	water_volume.z_index = 1
 	# The shader uses the same sampled contour as the visible soil, never a shore fog mask.
-	water_volume.polygon = PackedVector2Array([Vector2(-120,573),Vector2(2700,573),Vector2(2700,900),Vector2(-120,900)])
+	water_volume.polygon = PackedVector2Array([Vector2(-120,488),Vector2(2900,488),Vector2(2900,1600),Vector2(-120,1600)])
 	var heights := Image.create(706,1,false,Image.FORMAT_RF)
 	for i in heights.get_width():
 		heights.set_pixel(i,0,Color(_bank_edge_y(-120.0+i*4.0)/1024.0,0,0,1))
-	var shader := Shader.new()
-	shader.code = """shader_type canvas_item;
-uniform sampler2D scene_color : hint_screen_texture, repeat_disable, filter_linear;
-uniform sampler2D bank_height : repeat_disable, filter_linear;
-uniform sampler2D waves : repeat_disable, filter_linear;
-uniform float wave_x0 = 1100.0;
-uniform float wave_dx = 4.0;
-uniform float wave_n = 264.0;
-uniform float water_y = 575.0;
-uniform float clock = 0.0;
-varying vec2 world_position;
-void vertex() {
-	world_position = (MODEL_MATRIX * vec4(VERTEX, 0.0, 1.0)).xy;
-}
-void fragment() {
-	vec2 wave_uv = vec2(((world_position.x - wave_x0) / wave_dx + 0.5) / wave_n, 0.5);
-	float swell = texture(waves, wave_uv).r;
-	float swell_slope = (texture(waves, wave_uv + vec2(1.0 / wave_n, 0.0)).r - texture(waves, wave_uv - vec2(1.0 / wave_n, 0.0)).r) / (2.0 * wave_dx);
-	float wave = sin(world_position.x * 0.035 + clock * 1.6) * 0.55 - swell;
-	float depth = world_position.y - water_y - wave;
-	if (depth < 0.0) { discard; }
-	float bed = texture(bank_height,vec2(((world_position.x+120.0)/4.0+0.5)/706.0,0.5)).r * 1024.0;
-	float clearance = bed - world_position.y;
-	if (clearance <= 0.0) { discard; }
-	float edge_aa = smoothstep(0.0, max(fwidth(world_position.y),0.5), clearance);
-	float distortion = sin(world_position.y * 0.14 + clock * 2.1) * 0.35;
-	distortion += sin(world_position.x * 0.07 - clock * 1.3) * 0.15;
-	distortion *= smoothstep(0.0,4.0,clearance);
-	// a moving swell bends what is seen through it, most near the top
-	vec2 bend = vec2(distortion + swell_slope * 30.0 * exp(-depth / 40.0), swell_slope * 7.0 * exp(-depth / 25.0));
-	vec2 refract_uv = SCREEN_UV + bend * SCREEN_PIXEL_SIZE * smoothstep(0.0, 16.0, depth);
-	vec3 submerged = texture(scene_color, refract_uv).rgb;
-	// Retain sharp submerged silhouettes; no blur or rapid milky depth extinction.
-	float transmission = mix(0.90,0.60,smoothstep(0.0,12.0,depth));
-	float water_tone = mix(0.47,0.29,smoothstep(0.0,260.0,depth));
-	vec3 water = mix(vec3(water_tone), submerged * 0.82, transmission);
-	float world_pixel = SCREEN_PIXEL_SIZE.y / max(fwidth(world_position.y),0.001);
-	vec2 reflected_uv = vec2(refract_uv.x,SCREEN_UV.y-(depth*2.0+wave)*world_pixel);
-	vec3 reflected = texture(scene_color,clamp(reflected_uv,vec2(0.0),vec2(1.0))).rgb;
-	water = mix(water,reflected,0.07*exp(-depth/65.0));
-	float surface_band = (1.0-smoothstep(0.0,2.4,depth)) * (0.08+0.03*sin(world_position.x*0.019+clock*0.6));
-	surface_band *= 1.0 + abs(swell_slope) * 7.0 + abs(swell) * 0.12;
-	water = mix(water,vec3(0.63),clamp(surface_band,0.0,0.7));
-	// the faces of a swell catch the light just under the surface
-	float glint = clamp(abs(swell_slope) * 2.4, 0.0, 0.45) * (1.0 - smoothstep(0.0, 9.0, depth));
-	water += vec3(0.22) * glint;
-	COLOR = vec4(water,edge_aa);
-}"""
-	var material_value := ShaderMaterial.new()
-	material_value.shader = shader
+	var material_value:=ShaderMaterial.new()
+	material_value.shader=preload("res://assets/shaders/river_plane_v69.gdshader")
+	material_value.set_shader_parameter("forest",valley_depth.FAR)
 	material_value.set_shader_parameter("bank_height",ImageTexture.create_from_image(heights))
+	boat_foam=Polygon2D.new();boat_foam.z_index=9
+	boat_foam.polygon=PackedVector2Array([Vector2(-180,-22),Vector2(180,-22),Vector2(180,35),Vector2(-180,35)])
+	var foam_shader:=Shader.new()
+	foam_shader.code="""shader_type canvas_item;
+render_mode unshaded;
+uniform float motion=0.;
+uniform float direction=1.;
+uniform float clock=0.;
+uniform sampler2D bank_height:repeat_disable,filter_linear;
+varying vec2 world_point;
+varying vec2 point;
+void vertex(){point=VERTEX;world_point=(MODEL_MATRIX*vec4(VERTEX,0.,1.)).xy;}
+void fragment(){
+ float left=exp(-pow((point.x+67.)/(18.+motion*24.),2.)-pow((point.y-8.)/(2.5+motion*2.3),2.));
+ float right=exp(-pow((point.x-67.)/(18.+motion*24.),2.)-pow((point.y-8.)/(2.5+motion*2.3),2.));
+ float trail=exp(-pow((point.x+direction*76.)/(62.+motion*68.),2.)-pow((point.y-11.)/4.5,2.))*motion*.60;
+ float bed=texture(bank_height,vec2(((world_point.x+120.)/4.+.5)/706.,.5)).r*1024.;
+ float contact=smoothstep(0.,12.,bed-world_point.y);
+ float variation=.82+.18*sin(point.x*.071+clock*1.7)*sin(point.y*.27-clock*.9);
+ float mist=(left+right+trail)*variation;
+ COLOR=vec4(vec3(.83),clamp(mist*(.055+motion*.29)*contact,0.,.48));
+}
+"""
+	var foam_material:=ShaderMaterial.new();foam_material.shader=foam_shader;foam_material.set_shader_parameter("bank_height",ImageTexture.create_from_image(heights));boat_foam.material=foam_material;add_child(boat_foam)
 	_init_waves()
 	material_value.set_shader_parameter("waves", wave_texture)
 	water_volume.material = material_value
 	add_child(water_volume)
+	# Warm the exact material offscreen during chapter construction, before
+	# the river can enter the camera. Inputs are immutable preloaded resources.
+	var warm:=SubViewport.new();warm.size=Vector2i(64,64);warm.disable_3d=true;warm.transparent_bg=true;add_child(warm)
+	var warm_plane:=Polygon2D.new();warm_plane.polygon=water_volume.polygon;warm_plane.material=material_value;warm.add_child(warm_plane)
+	warm.canvas_transform=Transform2D(0.,Vector2(.02,.06),0.,Vector2(0.,-28.))
+	warm.render_target_update_mode=SubViewport.UPDATE_ONCE
+	_finish_water_warmup.call_deferred(warm)
+
+func _finish_water_warmup(warm:SubViewport)->void:
+	await RenderingServer.frame_post_draw
+	await RenderingServer.frame_post_draw
+	var image:Image=warm.get_texture().get_image()
+	water_prepared=not image.is_empty() and image.get_used_rect().has_area()
+	if not water_prepared:push_error("River material warmup produced no rendered pixels")
+	warm.queue_free()
 
 func _init_waves() -> void:
 	wave_h.resize(WAVE_N)
@@ -603,8 +635,8 @@ func _init_waves() -> void:
 	for i in WAVE_N:
 		var x := WAVE_X0 + i * WAVE_DX
 		# the banks soak the swell up (it does not bounce back off the mud like off a wall)
-		var shore := minf(absf(x - 1156.0), absf(x - 2060.0))
-		var outside := 1.0 if (x < 1156.0 or x > 2060.0) else 0.0
+		var shore := minf(absf(x - 1156.0), absf(x - 1980.0))
+		var outside := 1.0 if (x < 1156.0 or x > 1980.0) else 0.0
 		wave_damp[i] = WAVE_DAMP + 5.0 * (1.0 - smoothstep(0.0, 70.0, shore)) + 8.0 * outside
 	wave_texture = ImageTexture.create_from_image(Image.create_from_data(WAVE_N, 1, false, Image.FORMAT_RF, wave_h.to_byte_array()))
 
@@ -795,7 +827,7 @@ func _update_gust(delta: float) -> void:
 			# the water crinkles under the front while it is over the river
 			var front_x := gust_origin.x + gust_dir * _gust_reach()
 			gust_ripple_gap -= delta
-			if gust_ripple_gap <= 0.0 and front_x > 1156.0 and front_x < 2060.0 and gust_age < 1.0:
+			if gust_ripple_gap <= 0.0 and front_x > 1156.0 and front_x < 1980.0 and gust_age < 1.0:
 				gust_ripple_gap = 0.07
 				gust_ripples.append({"x": front_x + spray_rng.randf_range(-20.0, 20.0), "age": 0.0, "size": spray_rng.randf_range(0.8, 1.3)})
 	for k in range(gust_ripples.size() - 1, -1, -1):
@@ -929,9 +961,9 @@ func _blur_material(direction: Vector2, sigma: float) -> ShaderMaterial:
 	material_value.set_shader_parameter("sigma", sigma)
 	return material_value
 
-func _transparent_view() -> SubViewport:
+func _transparent_view(padding:Vector2=Vector2.ZERO) -> SubViewport:
 	var viewport := SubViewport.new()
-	viewport.size = Vector2i(1280, 720)
+	viewport.size = Vector2i(SCREEN+padding*2.)
 	viewport.transparent_bg = true
 	viewport.disable_3d = true
 	viewport.render_target_update_mode = SubViewport.UPDATE_ALWAYS
@@ -940,9 +972,11 @@ func _transparent_view() -> SubViewport:
 
 # Two separable gaussian passes. The old single 9-tap blur laid nine shifted copies of each edge
 # over each other, which read as stepped bands and ghost lines instead of a soft, clean edge.
-func _blur_layer(parent: Node, radius: float) -> SubViewport:
-	var viewport := _transparent_view()
-	var horizontal := _transparent_view()
+func _blur_layer(parent: Node, radius: float, padding:Vector2=Vector2.ZERO) -> SubViewport:
+	var viewport := _transparent_view(padding)
+	var draw_root:=Node2D.new();draw_root.position=padding;viewport.add_child(draw_root)
+	viewport.set_meta(&"draw_root",draw_root)
+	var horizontal := _transparent_view(padding)
 	var first := Sprite2D.new()
 	first.centered = false
 	first.texture = viewport.get_texture()
@@ -951,6 +985,7 @@ func _blur_layer(parent: Node, radius: float) -> SubViewport:
 	var sprite := Sprite2D.new()
 	sprite.centered = false
 	sprite.texture = horizontal.get_texture()
+	sprite.position=-padding
 	sprite.material = _blur_material(Vector2(0.0, 1.0), radius * 0.5)
 	parent.add_child(sprite)
 	viewport.set_meta(&"output_sprite", sprite)
@@ -1006,11 +1041,17 @@ func _redraw_due() -> bool:
 	return true
 
 func sync(delta: float, new_camera: float, active: bool) -> void:
+	if active and level.has_method("sync_chapter_camera"):level.sync_chapter_camera(delta)
 	var redraw := _redraw_due()
 	visible = active
 	clock += delta
 	var roots:Node2D=level.get("bridge_to_c") if level.get_script().resource_path.ends_with("chapter_01_route.gd") else null
 	mine_preview=roots!=null and roots.active and roots.mine_trial!=null and roots.mine_trial.gap.art.pair_room.relay.valley_preview_active()
+	# Presentation can reach the exit before the relay's next physics tick
+	# (wide camera, checkpoint restore, or a first-frame preview). Resolve the
+	# fresh valley state before projecting any of it into the visible world.
+	# The existing one-shot guard preserves a moved boat on return travel.
+	if mine_preview:roots.prepare_c_zone_preview()
 	var preview_offset:=Vector2(3600,-3050) if mine_preview else Vector2.ZERO
 	position=preview_offset
 	camera_x = new_camera-preview_offset.x
@@ -1023,14 +1064,19 @@ func sync(delta: float, new_camera: float, active: bool) -> void:
 	# the forest backdrop is cut away from the right, so the valley opens up ahead of him before the trees are gone
 	# A fixed world-space forest edge. Walking past it reveals the valley
 	# already behind the trees; no screen-wide backdrop crossfade.
-	var reveal: float = (Scene1Ref.CLIFF_X-1050.0-camera_x)/1280.0 if camera_x < -2400.0 else 2.0
+	var reveal: float = (Scene1Ref.CLIFF_X-1950.0-camera_x)/1280.0 if camera_x < -2400.0 else 2.0
 	(background.material as ShaderMaterial).set_shader_parameter("reveal_edge", reveal)
 	var gorge_mix:float=level.rope_ladder.entry_mix() if level.rope_ladder != null else 0.0
 	var in_forest:bool = not mine_preview and camera_x < -2400.0 and not root_context and not (level.descent != null and level.descent.enabled)
 	# Image planes are part of this forest bank. None may grow over the void
 	# beyond the actual cliff, even if the plate contains an offscreen trunk.
-	for plane in [plates_far,plates_mid,plates_close,plates_near]:
-		plane.set_ground_limit(Scene1Ref.edge_x()-camera_x)
+	var backdrop_zoom:float=level.camera.zoom.x if in_forest else 1.
+	for plane in [plates_far,plates_mid,plates_close]:
+		plane.framing_margin=FOREST_NEAR_PAD.x
+		plane.scale=Vector2.ONE*backdrop_zoom
+		plane.position=SCREEN*.5*(1.-backdrop_zoom)
+		plane.set_ground_limit(640.+(Scene1Ref.edge_x()-camera_x-640.)*backdrop_zoom)
+	plates_near.set_ground_limit(Scene1Ref.edge_x()-camera_x)
 	if hunter_art != null:
 		hunter_art.sync(delta, camera_x, view_camera_y, level.scene1.hunter if level.scene1 != null else null, active and camera_x < -2400.0)
 	weather_level = Scene1Ref.weather(camera_x)
@@ -1051,17 +1097,26 @@ func sync(delta: float, new_camera: float, active: bool) -> void:
 	else:
 		bat_flock.sync(delta, 0.0, Vector2.ZERO, 0.0, false)
 	var c_depth:bool=not in_forest and not root_context and (mine_preview or (roots!=null and roots.in_c_zone) or (roots==null and camera_x>=-200))
-	valley_depth.sync(camera_x,view_camera_y,c_depth)
+	if not in_forest and not c_depth:level.marsh_art.suspend_ink()
+	water_cove.sync(active and c_depth,clock)
+	contact_grass.visible=c_depth and active
+	valley_depth.sync(camera_x,view_camera_y,c_depth,level.camera.zoom.x)
 	valley_near.sync(camera_x,view_camera_y,c_depth)
 	valley_front.sync(camera_x,view_camera_y,c_depth)
-	level.actor.set_forest_light(c_depth and not mine_preview and active,valley_depth.FAR,Vector2(camera_x,view_camera_y),valley_depth.clock)
-	valley_player_light.sync(c_depth and not mine_preview and active,valley_depth.FAR,Vector2(camera_x,view_camera_y),valley_depth.clock)
-	valley_player_focus.sync(c_depth and not mine_preview and active)
+	level.actor.set_forest_light(false,valley_depth.FAR,Vector2(camera_x,view_camera_y),valley_depth.clock)
+	valley_player_light.sync(false,valley_depth.FAR,Vector2(camera_x,view_camera_y),valley_depth.clock if c_depth and not mine_preview else clock)
+	# Stable focus belongs to the playing plane across the entire route,
+	# including the gorge and mine, rather than to a moving C-only spot.
+	valley_player_focus.sync(active)
+	forest_integration.sync(active,valley_player_focus.mask_view.get_texture())
 	background.visible = not in_forest and not c_depth
 	(atmosphere.material as ShaderMaterial).set_shader_parameter("atmosphere_strength", 0.0 if in_forest or c_depth else 1.0)
 	forest_back.visible = in_forest
 	route_back.visible = in_forest
 	var route_material := route_back.material as ShaderMaterial
+	var lens_zoom:float=level.camera.zoom.x if in_forest else 1.
+	for backdrop in [route_back,opening_back,forest_back]:
+		(backdrop.material as ShaderMaterial).set_shader_parameter("framing_zoom",lens_zoom)
 	route_material.set_shader_parameter("scroll", camera_x)
 	route_material.set_shader_parameter("clock", clock)
 	route_material.set_shader_parameter("ground_y", Scene1Ref.GROUND_Y-view_camera_y)
@@ -1089,7 +1144,7 @@ func sync(delta: float, new_camera: float, active: bool) -> void:
 		plates_far.sync(camera_x,ground_screen-30.0,(Scene1Ref.START_X-525.0)*.16+1700.0)
 		plates_mid.sync(camera_x,ground_screen,(Scene1Ref.START_X-525.0)*.32+1500.0)
 		plates_close.sync(camera_x,ground_screen,(Scene1Ref.START_X-525.0)*.50+700.0)
-		plates_near.set_fade(1.0 - smoothstep(-4800.0, -4200.0, camera_x))
+		plates_near.set_fade(1.0) # Solid foreground exits by placement, never by fading the trunk.
 		var route := clampf((camera_x + 525.0 - Scene1Ref.START_X) / (Scene1Ref.CLIFF_X - Scene1Ref.START_X), 0.0, 1.0)
 		var centre := camera_x + 640.0
 		var shaft_strength := 1.0 - smoothstep(500.0, 1900.0, absf(centre - Scene1Ref.LIGHT_X))
@@ -1139,7 +1194,7 @@ func sync(delta: float, new_camera: float, active: bool) -> void:
 		surface_art.set_far_placement(fire_ground-Vector2(1017,378)*0.78,0.78,1.0)
 		surface_art.sync(delta, 0.0, 0.0, true, 0.0)
 		surface_art.gameplay_sprite.show()
-		surface_art.tree_sprite.show()
+		surface_art.tree_sprite.hide() # Open cliff vista: no decorative far-yard tree.
 		surface_art.tree_sprite.position=Vector2(1132,378)-DESTINATION_TREE_ROOT*DESTINATION_TREE_SCALE
 		# Keep the live particles; discard the sharp baked campfire/stone decal.
 		surface_art.fire_sprite.hide()
@@ -1156,7 +1211,9 @@ func sync(delta: float, new_camera: float, active: bool) -> void:
 	if landmark_layer.visible:
 		landmark_output.material.set_shader_parameter("exposure",1.0)
 		landmark_output.material.set_shader_parameter("valley_shade",descent_shade)
-	water_volume.visible = camera_x < 2750.0
+	water_volume.visible = water_cove.visible and water_prepared
+	boat_immersion.set_shader_parameter("immersed",1. if level.floating and water_cove.visible else 0.)
+	boat_foam.visible=level.floating and water_cove.visible
 	background.position.x = -90.0 - maxf(camera_x, 0.0) * 0.10
 	background.position.y=-95.0-view_camera_y*0.32 if root_context else -95.0
 	(background.material as ShaderMaterial).set_shader_parameter("valley_entry",1.0-smoothstep(-600.0,0.0,view_camera_y) if root_context else 0.0)
@@ -1194,6 +1251,8 @@ func sync(delta: float, new_camera: float, active: bool) -> void:
 	crate_art.rotation = level.crate_tilt
 	raft_front.transform = crate_art.transform
 	(water_volume.material as ShaderMaterial).set_shader_parameter("clock", clock)
+	(water_volume.material as ShaderMaterial).set_shader_parameter("camera_position",Vector2(camera_x,view_camera_y))
+	(water_volume.material as ShaderMaterial).set_shader_parameter("world_offset",preview_offset)
 	_update_waves(delta)
 	for i in range(water_impacts.size() - 1, -1, -1):
 		water_impacts[i].age += delta
@@ -1207,6 +1266,9 @@ func sync(delta: float, new_camera: float, active: bool) -> void:
 		mid.queue_redraw()
 		foreground.queue_redraw()
 	near_blur_sprite.visible = in_forest
+	var forest_zoom:float=level.camera.zoom.x if in_forest else 1.
+	near_blur_sprite.scale=Vector2.ONE*forest_zoom
+	near_blur_sprite.position=SCREEN*.5*(1.-forest_zoom)-FOREST_NEAR_PAD*forest_zoom
 	# The existing world-space ground cover survives backdrop changes. It
 	# leaves the view by scrolling above the camera, never by a scene flag.
 	var show_ground:bool = not mine_preview and camera_x < -2400.0 and view_camera_y<-4250.0 and not (level.descent != null and level.descent.enabled)
@@ -1221,13 +1283,15 @@ func sync(delta: float, new_camera: float, active: bool) -> void:
 	weather_art.modulate.a = 1.0-below_cliff
 	near_view.render_target_update_mode = SubViewport.UPDATE_ALWAYS if in_forest else SubViewport.UPDATE_DISABLED
 	if in_forest:
-		plates_near.sync(camera_x, Scene1Ref.GROUND_Y - view_camera_y, (Scene1Ref.START_X + 3300.0) * 1.45)
+		plates_near.sync(camera_x, Scene1Ref.GROUND_Y - view_camera_y, (Scene1Ref.START_X + 3300.0) * 1.22)
 	# Ground cover is static world geometry, prepared across the whole forest.
 	# Move retained drawing commands with the camera instead of regenerating
 	# only the current screen (and repeatedly sampling/randomising each tuft).
-	var grass_origin := -Vector2(camera_x, view_camera_y)
-	grass_art.position = grass_origin
-	grass_band.position = grass_origin
+	# World-space ground cover shares the actual camera transform and depth
+	# coverage with the ground, including on the cliff. Near-lens vegetation
+	# stays in its independent, strongly defocused front layer.
+	grass_art.position = Vector2.ZERO
+	grass_band.position = Vector2.ZERO
 	var grass_edge := Scene1Ref.edge_x()
 	if show_ground and grass_edge != _grass_cached_edge:
 		_grass_cached_edge = grass_edge
@@ -1270,13 +1334,12 @@ func _draw_mid() -> void:
 		mid.draw_colored_polygon(PackedVector2Array([Vector2(x-5,229),Vector2(x+80,172),Vector2(x+180,140),Vector2(x+87,163),Vector2(x+3,207)]),c)
 
 func _draw_terrain() -> void:
-	_draw_bank_mass(-520.0,1350.0)
-	_draw_bank_mass(1880.0,2800.0)
+	# The river module owns both complete banks; no partial terrain skirts.
 	var rng := RandomNumberGenerator.new()
 	rng.seed = 4721
 	for i in range(255):
 		var x := rng.randf_range(220.0, 2540.0)
-		if x > 1250.0 and x < 1980.0:
+		if x > 800.0 and x < 2550.0:
 			continue
 		var y := _bank_edge_y(x)
 		var height := rng.randf_range(3.0, 14.0)
@@ -1294,27 +1357,6 @@ func _bank_edge_y(x: float) -> float:
 	var earth := bank_noise.get_noise_1d(x) * 9.0 + bank_noise.get_noise_1d(x*3.7) * 2.0
 	# Keep exposed contact contours close to the unchanged physics surface.
 	return lerpf(ground, rounded, underwater) - 2.0 + earth * lerpf(0.65,2.0,underwater)
-
-func _draw_bank_mass(start: float, end: float) -> void:
-	var edge := PackedVector2Array()
-	for x in range(int(start),int(end),4):
-		edge.append(Vector2(x,_bank_edge_y(x)))
-	edge.append(Vector2(end,_bank_edge_y(end)))
-	var mass := edge.duplicate()
-	mass.append(Vector2(end,1000))
-	if start == -520.0:
-		# A broken cliff toe, not a cut-off rectangular bank at the descent exit.
-		mass.append(Vector2(start-125,1000))
-		mass.append(Vector2(start-70,770))
-		mass.append(Vector2(start-88,686))
-		mass.append(Vector2(start-40,560))
-		mass.append(Vector2(start-54,490))
-		mass.append(Vector2(start-18,392))
-		mass.append(Vector2(start-28,340))
-		mass.append(Vector2(start-4,302))
-	else:mass.append(Vector2(start,1000))
-	terrain.draw_colored_polygon(mass,INK)
-	terrain.draw_polyline(edge,INK,1.8,true)
 
 func _beam(canvas: Node2D, a: Vector2, b: Vector2, width: float, seed_value: float) -> void:
 	var normal := (b-a).normalized().orthogonal() * width * 0.5
@@ -1338,7 +1380,7 @@ func _draw_props() -> void:
 	_beam(props,Vector2(563,419),Vector2(558,550),8,8)
 	_beam(props,Vector2(373,466),Vector2(420,421),6,3)
 	if level.completed:
-		props.draw_circle(Vector2(2460,517),3.0,Color(0.76,0.76,0.76),true,-1,true)
+		props.draw_circle(Vector2(2460,level.ground_y(2460)-33),3.0,Color(0.76,0.76,0.76),true,-1,true)
 
 func _draw_crate() -> void:
 	_draw_boat_back()
@@ -1372,7 +1414,7 @@ func _draw_bank_grass() -> void:
 	var rng := RandomNumberGenerator.new()
 	rng.seed = 8117
 	# Dense ankle-height tufts follow world-space ground, including both shore slopes.
-	for span in [Vector2(12,250), Vector2(1050,1260), Vector2(1968,2145)]:
+	for span in [Vector2(12,250), Vector2(780,1120), Vector2(2070,2440)]:
 		var opening: bool = span.x < 250.0
 		var roots := PackedVector2Array()
 		for sample in range(int(span.x), int(span.y) + 1, 4):
@@ -1396,22 +1438,15 @@ func _draw_bank_grass() -> void:
 			x += rng.randf_range(3,6)
 
 func _draw_surface() -> void:
-	for i in range(34):
-		var x := 1180.0 + fposmod(i*73.79+clock*(1.6+float(i%3)),850.0)
-		var y := 578.0+float(i%7)*11.0+sin(clock*0.6+i)*1.8
-		var alpha := 0.025 + sin(clock*0.5+i)*0.012
-		surface.draw_line(Vector2(x,y),Vector2(x+18.0+float(i%5)*8.0,y),Color(0.83,0.83,0.83,alpha),1.0,true)
 	if level.floating:
 		var span: Vector2 = level.crate_waterline_span()
 		var center := Vector2((span.x + span.y) * 0.5, level.WATER_Y)
-		for x in [span.x, span.y]:
-			surface.draw_line(Vector2(x-9.0,water_line(x-9.0)),Vector2(x+11.0,water_line(x+11.0)),Color(0.74,0.74,0.74,0.20),1.2,true)
-		for i in range(3):
-			var phase := fposmod(clock*0.65+i/3.0,1.0)
-			surface.draw_set_transform(Vector2(center.x,water_line(center.x)+4.0),0.0,Vector2(1.0,0.13))
-			surface.draw_arc(Vector2.ZERO,level.CRATE_SIZE.x*0.5+phase*52.0,0,TAU,40,Color(0.74,0.74,0.74,(1.0-phase)*0.14),1.7,true)
-			surface.draw_set_transform(Vector2.ZERO)
-	_draw_swell_lines()
+		boat_foam.position=Vector2(center.x,water_line(center.x))
+		var foam_material:=boat_foam.material as ShaderMaterial
+		foam_material.set_shader_parameter("motion",clampf(absf(level.crate.velocity.x)/85.0+wave_energy/45.0,0.,1.))
+		foam_material.set_shader_parameter("clock",clock)
+		foam_material.set_shader_parameter("direction",1. if level.crate.velocity.x>=0. else -1.)
+	boat_foam.visible=level.floating and water_cove.visible
 	for impact in water_impacts:
 		_draw_water_impact(impact)
 	for ripple in gust_ripples:
@@ -1429,8 +1464,8 @@ func _draw_surface() -> void:
 func _draw_swell_lines() -> void:
 	if wave_energy < 0.6:
 		return
-	var from_x := maxf(WAVE_X0 + 8.0, camera_x - 20.0)
-	var to_x := minf(WAVE_X0 + (WAVE_N - 2) * WAVE_DX, camera_x + 1300.0)
+	var from_x := maxf(WAVE_X0 + 8.0, camera_x-640.*(1./minf(level.camera.zoom.x,1.)-1.)-20.)
+	var to_x := minf(WAVE_X0 + (WAVE_N - 2) * WAVE_DX, camera_x+1280.+640.*(1./minf(level.camera.zoom.x,1.)-1.)+20.)
 	if to_x <= from_x:
 		return
 	var x := from_x

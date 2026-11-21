@@ -3,6 +3,8 @@ extends RefCounted
 const Motion=preload("res://scripts/chapters/forest_predator_motion.gd")
 const Layout=preload("res://scripts/chapters/forest_predator_layout.gd")
 const PICKUP_TIME:=0.87
+const HANGING_PICKUP_TIME:=1.75
+const HANGING_GRASP_FRAME:=20
 const THROW_TIME:=0.34
 const RELEASE_AT:=0.15
 const WINDUP:=Motion.WINDUP_TIME
@@ -27,6 +29,8 @@ var bait_position:=Vector2.ZERO # grasp point at the tied feet
 var bait_velocity:=Vector2.ZERO
 var bait_angle:=0.0
 var pickup_from:=Vector2.ZERO
+var pickup_hanging:=false
+var pickup_contact_offset:=Vector2.ZERO
 var captured_from:=Vector2.ZERO
 var attack_side:=-1.0
 var retry_armed:=false
@@ -61,6 +65,8 @@ func reset(full:=false)->void:
 	action_time=0
 	throw_animation=0
 	rope_attached=not solved
+	pickup_hanging=false
+	pickup_contact_offset=Vector2.ZERO
 	dust.clear()
 	fluid.clear()
 	snap_splashed=false
@@ -89,10 +95,14 @@ func mouth()->Vector2:
 func pose_info()->Dictionary:
 	if not enabled:return {"action":&"none","progress":0.0}
 	if captured():return {"action":&"uncontrolled_fall","progress":clampf(time,0,1)}
-	if bait==Bait.PICKING:return {"action":&"pickup","progress":clampf(action_time/PICKUP_TIME,0,1)}
+	if bait==Bait.PICKING:return {"action":&"hanging_pickup" if pickup_hanging else &"pickup","progress":clampf(action_time/(HANGING_PICKUP_TIME if pickup_hanging else PICKUP_TIME),0,1)}
 	if throw_animation>0:return {"action":&"throw_release","progress":1.0-throw_animation/THROW_TIME}
 	return {"action":&"none","progress":0.0}
 func can_take()->bool:
+	if bait==Bait.HANGING:
+		var side:=signf(bait_position.x-feet().x)
+		var reach:=feet()+Vector2(side*19.5,-79.6+scene.level.actor.support_offset)
+		if reach.distance_to(bait_position)>6.0:return false
 	return near() and bait in [Bait.HANGING,Bait.GROUND] and scene.level.player.is_on_floor() and absf(feet().x-bait_position.x)<PICKUP_RANGE and absf(feet().y-(bait_position.y+15 if bait==Bait.GROUND else ground(bait_position.x)))<30
 func interact()->bool:
 	if not near() or scene.intro_time<scene.LIE_TIME+scene.GET_UP_TIME or captured():return false
@@ -103,9 +113,11 @@ func interact()->bool:
 			action_time=0
 		return true
 	if can_take() and Input.is_action_just_pressed("interact"):
+		pickup_hanging=bait==Bait.HANGING
 		bait=Bait.PICKING
 		action_time=0
 		pickup_from=bait_position
+		pickup_contact_offset=Vector2.ZERO
 		scene.level.facing=signf(bait_position.x-feet().x) if absf(bait_position.x-feet().x)>1 else scene.level.facing
 		_sound("cloth")
 		return true
@@ -137,10 +149,14 @@ func _bait_tick(delta:float)->void:
 		bait_position=hanging_point()
 	elif bait==Bait.PICKING:
 		action_time+=delta
-		if action_time>=PICKUP_TIME*0.48:
+		if pickup_hanging:
+			# Transfer after presenting this exact animation frame, not last frame's hand.
+			if action_time>=HANGING_PICKUP_TIME:
+				bait=Bait.HANGING if rope_attached else Bait.HELD
+		elif action_time>=PICKUP_TIME*0.48:
 			rope_attached=false
 			bait_position=pickup_from.lerp(hand(),smoothstep(0.48,0.98,action_time/PICKUP_TIME))
-		if action_time>=PICKUP_TIME:bait=Bait.HELD
+		if not pickup_hanging and action_time>=PICKUP_TIME:bait=Bait.HELD
 	elif bait==Bait.HELD:bait_position=hand()
 	elif bait==Bait.THROWING:
 		action_time+=delta
@@ -260,6 +276,14 @@ func tick(delta:float)->void:
 		_spray_juice()
 	if flower==Flower.EATING and time>0.6:bait=Bait.GONE
 func apply_actor(actor:Node2D)->void:
+	if bait==Bait.PICKING and pickup_hanging:
+		var current_hand:=hand()
+		if rope_attached and actor.current_clip==&"hanging_pickup" and actor.current_frame_index>=HANGING_GRASP_FRAME:
+			if current_hand.distance_to(pickup_from)<=6.0:
+				pickup_contact_offset=pickup_from-current_hand
+				rope_attached=false
+		if not rope_attached:
+			bait_position=current_hand+pickup_contact_offset*(1.0-smoothstep(0.45,0.90,action_time/HANGING_PICKUP_TIME))
 	if not captured():return
 	actor.position=captured_from.lerp(mouth()+Vector2(0,30),smoothstep(0.0,0.20,time))
 	actor.rotation=-attack_side*0.25*smoothstep(0.0,0.20,time)

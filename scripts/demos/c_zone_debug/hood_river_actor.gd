@@ -73,6 +73,7 @@ func _ready() -> void:
 	load_zone("river")
 	load_group("shove")
 	load_group("tired")  # the bent-over panting (scene 1: out of breath at the cliff)
+	load_group("hanging")  # preload the standing reach before approaching the rabbit
 
 func reset_grip_animation() -> void:
 	held_clip = &"grip_hold"

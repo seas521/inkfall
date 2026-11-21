@@ -64,7 +64,9 @@ void fragment(){
   if(!twig_only && twig)discard;
  }
  // Keep the existing scene's deep ink; texture never becomes a gray mass.
- float tone=0.004;
+ // Match the actor's dense ink. This is linear HDR, not an sRGB swatch;
+ // the former .004 became a gray wooden face once the bough was in focus.
+ float tone=0.00012;
  // Generated cutout interiors carried residual transparency and leaked the bright valley.
  // A small optical edge, without lifting black wood or blurring its interior.
  vec2 edge_step=TEXTURE_PIXEL_SIZE*1.4;

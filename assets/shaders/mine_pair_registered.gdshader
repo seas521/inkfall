@@ -25,7 +25,12 @@ void fragment(){
    remaining=(1.0-alphas.x)*(1.0-alphas.y)*(1.0-alphas.z)*(1.0-alphas.w);
   }
   if(layer_role==0){
-   source=strongest>.008?clean:source;
+   // Keep the approved source below the dark silhouette. Replacing it
+   // with the clean wall erases a grown shape larger than the softened
+   // foreground and leaves a second pale rock outline in the open air.
+   // These registered static planes have no relative parallax.
+   float near_owner=max(grown(foreground_mask,UV,20.0),grown(structure_mask,UV,16.0));
+   source=mix(strongest>.008?clean:source,source,smoothstep(0.0,.02,near_owner));
   }else if(strongest>.008){
    // All overlapping plates share the same unassociated foreground color.
    // Overlap is intentional: disjoint masks cause bright seams when the
@@ -34,7 +39,17 @@ void fragment(){
    source=clamp((source-clean*remaining)/max(1.0-remaining,.0001),vec3(0),vec3(1));
   }else{a=0.0;}
  }
- if(left_feather>0.0)a*=smoothstep(0.0,left_feather,UV.x);
+ // Blend only the background contributors. Foreground signs, beams and
+ // solid rock must retain their original opaque black silhouettes.
+ if(left_feather>0.0){
+  bool solid_layer=layer_role==1 || layer_role==2;
+  float feather=solid_layer?min(left_feather,.04):left_feather;
+  float entrance=smoothstep(0.,feather,UV.x);
+  // Only the outer source fringe above the floor is blended on solids.
+  // Signs and gantry parts lie beyond this fringe and stay fully opaque.
+  if(solid_layer)entrance=mix(entrance,1.,smoothstep(450.,510.,pixel.y));
+  a*=entrance;
+ }
  // The playing plane shares the boy's dense silhouette. Rear galleries,
  // cavern air, lamps and their pools retain their independent values.
  if(layer_role==1 || layer_role==2)source=min(source,vec3(.00012));

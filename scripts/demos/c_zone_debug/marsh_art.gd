@@ -6,21 +6,26 @@ extends Node2D
 # overhangs), never in interior texture, and everything gameplay touches is ink.
 
 const SCREEN := Vector2(1280.0, 720.0)
+const INK_PAD := Vector2(24,24)
+const FOREST_INK_PAD := Vector2(336,192)
 const INK := Color("050606")
 const CliffArt = preload("res://scripts/demos/c_zone_debug/cliff_art.gd")
 const ForestInk = preload("res://scripts/demos/c_zone_debug/forest_ink.gd")
 const Scene1Ink = preload("res://scripts/demos/c_zone_debug/scene1_ink.gd")
 const InkFlame = preload("res://scripts/effects/ink_flame.gd")
 const GRASS_SHADER := """shader_type canvas_item;
+#include "res://assets/shaders/chapter_surface_response.gdshaderinc"
+varying vec2 grass_world;
 // source_color: the ink must be converted like any other colour, or an HDR 2D (linear) viewport
 // shows a hand-written 0.02 as mid grey instead of near black.
 uniform vec4 ink : source_color = vec4(0.02, 0.022, 0.022, 1.0);
 void vertex() {
 	float k = COLOR.r;
 	VERTEX.x += (sin(TIME * 1.25 + VERTEX.x * 0.07) * 1.5 + sin(TIME * 0.55 + VERTEX.x * 0.013) * 1.1) * k * k;
+	grass_world=(MODEL_MATRIX*vec4(VERTEX,0.0,1.0)).xy+source_world_offset;
 }
 void fragment() {
-	COLOR = vec4(ink.rgb, 1.0);
+	COLOR = vec4(ink.rgb+vec3(chapter_surface_light(grass_world)), 1.0);
 }"""
 
 # Everything made of ink is drawn as clean shapes into a screen-sized stage and then run through
@@ -170,7 +175,9 @@ func _layer(parent: Node, z: int, drawer: Callable) -> Node2D:
 # A screen-sized viewport that always shows the current camera window of the world.
 func _ink_stage(z: int, soften: float) -> Dictionary:
 	var view := SubViewport.new()
-	view.size = Vector2i(1280, 720)
+	# Broad optical taps need real geometry beyond the frame. Without this
+	# overscan, a near wall exposed the rectangular edge of its ink viewport.
+	view.size = Vector2i(SCREEN+INK_PAD*2.0)
 	view.transparent_bg = true
 	view.disable_3d = true
 	# the ink shapes are plain polygons: without this their edges are stair-stepped, and the steps crawl as the camera moves
@@ -194,9 +201,27 @@ func _ink_stage(z: int, soften: float) -> Dictionary:
 	add_child(sprite)
 	return {"view": view, "root": root, "sprite": sprite, "material": material}
 
+func set_gameplay_focus(enabled:bool)->void:
+	# Terrain and fine grass have separate source envelopes. Preserve a little
+	# more diffusion on the blades; distant/foreground plates are not touched.
+	(back_stage.material as ShaderMaterial).set_shader_parameter("soften",1.0 if enabled else 2.4)
+	(front_stage.material as ShaderMaterial).set_shader_parameter("soften",1.2 if enabled else 1.5)
+
+func suspend_ink()->void:
+	# The mine has its own world geometry. Retire the forest cache even when
+	# the chapter route bypasses this art controller's normal sync.
+	for stage in [back_stage,front_stage]:
+		stage.view.render_target_update_mode=SubViewport.UPDATE_DISABLED
+		var extent:=Vector2i(SCREEN+INK_PAD*2.)
+		if stage.view.size!=extent:stage.view.size=extent
+
 func sync(delta: float, new_camera_x: float, active: bool) -> void:
 	visible = active
-	var live := active and (new_camera_x > 1400.0 or new_camera_x < -200.0)
+	var inverse:Transform2D=level.get_canvas_transform().affine_inverse()
+	var right_world:float=(inverse*level.get_viewport_rect().size).x
+	# Warm the next terrain before the actual widened view reaches it. A fixed
+	# camera-x gate exposed the river bank's end when the lens pulled back.
+	var live:bool = active and (right_world>level.SECOND_ACT_LEDGE.position.x-320.0 or new_camera_x < -200.0)
 	for stage in [back_stage, front_stage]:
 		(stage.sprite as Sprite2D).modulate.a = 1.0
 		(stage.material as ShaderMaterial).set_shader_parameter("opacity",1.0)
@@ -212,14 +237,21 @@ func sync(delta: float, new_camera_x: float, active: bool) -> void:
 		bog_views[k].render_target_update_mode = SubViewport.UPDATE_ALWAYS if near else SubViewport.UPDATE_DISABLED
 	clock += delta
 	camera_x = new_camera_x
+	var forest_wide:bool=(new_camera_x< -3000. and level.player.position.y< -3900.) or new_camera_x> -200. or level.camera.zoom.x<.999
+	var padding:=FOREST_INK_PAD if forest_wide else INK_PAD
+	var extent:=Vector2i(SCREEN+padding*2.)
 	for stage in [back_stage, front_stage]:
+		if stage.view.size!=extent:stage.view.size=extent
 		var shake: Vector2 = level.camera.offset
 		var camera_y: float = level.camera_y
 		# The stage is moved in whole pixels: the picture is rasterised once per frame, and at a fractional offset every edge would be
 		# sampled differently from one frame to the next (the edges of the trunks crawled, which is what made running dizzy).
 		var snapped := Vector2(roundf(camera_x + shake.x), roundf(shake.y + camera_y))
-		(stage.root as Node2D).position = -snapped
-		(stage.sprite as Sprite2D).position = snapped
+		(stage.root as Node2D).position = -snapped+padding
+		(stage.sprite as Sprite2D).position = snapped-padding
+		if stage==front_stage and grass.material!=null:
+			(grass.material as ShaderMaterial).set_shader_parameter("source_world_offset",snapped-padding+global_position)
+	level.art.valley_player_light.sync_terrain_projection()
 	_sync_flames()
 	_update_effects(delta)
 	if _redraw_due():
@@ -240,7 +272,8 @@ func _redraw_due() -> bool:
 	return true
 
 func _visible_x(x: float, pad: float = 180.0) -> bool:
-	return x > camera_x - pad and x < camera_x + SCREEN.x + pad
+	var extra:float=640.*(1./minf(level.camera.zoom.x,1.)-1.)
+	return x > camera_x-extra-pad and x < camera_x+SCREEN.x+extra+pad
 
 func _build_mist_texture() -> GradientTexture2D:
 	var gradient := Gradient.new()
@@ -1242,7 +1275,7 @@ func _draw_fog_puffs() -> void:
 	for pit in level.MARSH_PITS:
 		var left: float = pit.x
 		var right: float = pit.y
-		if right < camera_x - 200.0 or left > camera_x + SCREEN.x + 200.0:
+		if not _visible_x((left+right)*.5,(right-left)*.5+200.):
 			continue
 		var width := right - left
 		var count := int(width / 62.0) + 3

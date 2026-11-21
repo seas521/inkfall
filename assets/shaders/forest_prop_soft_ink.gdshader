@@ -3,6 +3,9 @@ shader_type canvas_item;
 uniform vec4 ink : source_color = vec4(0.012, 0.013, 0.013, 1.0);
 uniform bool key_white = true;
 uniform float edge_softness = 1.1;
+// Optional alpha recovery for small interactive cutouts. Larger scenery
+// retains its original optical envelope unless explicitly opted in.
+uniform float coverage_recovery = 0.0;
 varying vec4 vertex_tint;
 void vertex() { vertex_tint = COLOR; }
 void fragment() {
@@ -19,5 +22,7 @@ void fragment() {
    total+=weight;
   }
  }
- COLOR=vec4(ink.rgb,ink.a*alpha/total)*vertex_tint;
+ float coverage=alpha/total;
+ coverage=mix(coverage,smoothstep(0.12,0.88,coverage),coverage_recovery);
+ COLOR=vec4(ink.rgb,ink.a*coverage)*vertex_tint;
 }

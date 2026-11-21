@@ -49,6 +49,23 @@ var previous_body:=Vector2.ZERO
 var body_history:=false
 var contact_impulses:=0
 
+func _ready()->void:
+	_prepare_fibers()
+
+func _prepare_fibers()->void:
+	if not fibers.is_empty():return
+	var a:=anchor()
+	for i in FIBER_COUNT+1:fibers.append(a+Vector2(0,(LENGTH+28.0)*i/FIBER_COUNT))
+	fiber_previous=fibers.duplicate()
+	_rebuild_strands()
+
+func _rebuild_strands()->void:
+	rope_points.clear()
+	tail_points.clear()
+	for i in LINKS+1:rope_points.append(_sample_fiber(grip*i/LINKS))
+	for i in 9:tail_points.append(_sample_fiber(grip+(LENGTH+28.0-grip)*i/8.0))
+	last_rope_tip=fibers[-1]
+
 # Fixed material nodes: climbing moves the grip constraint, never stretches the rope
 # or creates/deletes a tail. A reduced pendulum drives the loaded hand; the free
 # strand retains Verlet inertia. After release only the top knot remains pinned.
@@ -84,9 +101,7 @@ func _touch_free_rope(delta:float)->void:
 
 func _step_fibers(delta:float)->void:
 	var a:=anchor()
-	if fibers.is_empty():
-		for i in FIBER_COUNT+1:fibers.append(a+Vector2(0,(LENGTH+28.0)*i/FIBER_COUNT))
-		fiber_previous=fibers.duplicate()
+	_prepare_fibers()
 	var loaded:=state==State.CATCH or state==State.HANG
 	if not loaded:_touch_free_rope(delta)
 	else:body_history=false
@@ -117,11 +132,7 @@ func _step_fibers(delta:float)->void:
 				var correction:Vector2=(equilibrium-fibers[i])*(1.0-exp(-24.0*dt))
 				fibers[i]+=correction
 				fiber_previous[i]+=correction
-	rope_points.clear()
-	tail_points.clear()
-	for i in LINKS+1:rope_points.append(_sample_fiber(grip*i/LINKS))
-	for i in 9:tail_points.append(_sample_fiber(grip+(LENGTH+28.0-grip)*i/8.0))
-	last_rope_tip=fibers[-1]
+	_rebuild_strands()
 
 func _smooth_rope(raw:PackedVector2Array)->PackedVector2Array:
 	var result:=PackedVector2Array()
@@ -194,6 +205,7 @@ func reset()->void:
 	if route!=null:
 		route.level.actor.rotation=0
 		route.level.player.collision_mask=route.PLAYER_COLLISION_MASK
+	_prepare_fibers()
 	queue_redraw()
 
 func tick(delta:float)->bool:
@@ -384,7 +396,7 @@ func _draw()->void:
 		var wrap:=PackedVector2Array([at+Vector2(-4,-4),at+Vector2(-5,0),at+Vector2(-1,4),at+Vector2(4,2),at+Vector2(5,-2)])
 		draw_polyline(wrap,Color(0.009,0.009,0.009),1.7,true)
 	# Rope continues BELOW the hands. The unweighted tail lags and curls freely.
-	var tail:=_smooth_rope(tail_points) if not tail_points.is_empty() else PackedVector2Array([b,b+Vector2(0,24)])
+	var tail:=_smooth_rope(tail_points) if not tail_points.is_empty() else PackedVector2Array([b,a+axis*(LENGTH+28.0)])
 	for i in range(tail.size()-1):
 		draw_line(tail[i],tail[i+1],Color(0.009,0.009,0.009),lerpf(2.25,1.1,float(i)/maxf(1,tail.size()-1)),true)
 	for i in 3:

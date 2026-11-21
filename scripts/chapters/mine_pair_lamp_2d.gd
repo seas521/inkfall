@@ -16,6 +16,7 @@ var angular_velocity:=0.0
 var swing_angle:=0.0
 var suspension_length:=0.0
 func _ready()->void:
+ if get_meta("light_plane",&"background")==&"gameplay":add_to_group(&"chapter_gameplay_focus")
  var rear:=lamp_index>=4
  var ink:=ShaderMaterial.new();var shader:=Shader.new()
  shader.code="shader_type canvas_item; render_mode unshaded; uniform float tone=.02; void fragment(){ COLOR=vec4(vec3(tone),COLOR.a); }"

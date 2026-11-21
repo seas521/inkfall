@@ -1,4 +1,5 @@
 shader_type canvas_item;
+uniform float framing_zoom=1.0;
 uniform float scroll=0.0;
 uniform float clock=0.0;
 uniform float level=.6;
@@ -10,7 +11,7 @@ float hash21(vec2 p){return fract(sin(dot(p,vec2(127.1,311.7)))*43758.5453);}
 float noise(vec2 p){vec2 i=floor(p);vec2 f=fract(p);f=f*f*(3.0-2.0*f);return mix(mix(hash21(i),hash21(i+vec2(1,0)),f.x),mix(hash21(i+vec2(0,1)),hash21(i+vec2(1,1)),f.x),f.y);}
 float fbm(vec2 p){float a=.5;float s=0.;for(int i=0;i<4;i++){s+=a*noise(p);p=p*2.03+17.;a*=.5;}return s;}
 void fragment(){
- vec2 p=SCREEN_UV*vec2(1280.,720.);
+ vec2 p=vec2(640,360)+(SCREEN_UV*vec2(1280,720)-vec2(640,360))/framing_zoom;
  float up=clamp((horizon-p.y)/horizon,0.,1.);
  float patch=fbm(vec2((p.x+scroll*.07)*.003,p.y*.0042));
  float streak=noise(vec2((p.x+scroll*.20)*.010,.5));
@@ -49,6 +50,6 @@ void fragment(){
  float world=(p.x+scroll)/1280.;
  float columns=(noise(vec2(world*16.,1.))-.5)*.20+(noise(vec2(world*5.,UV.y*3.))-.5)*.14;
  float front=reveal_edge+(noise(vec2(UV.y*5.,3.))-.5)*.28+(UV.y-.5)*.18;
- float keep=1.-smoothstep(front-.34,front+.34,SCREEN_UV.x+columns);
+ float keep=1.-smoothstep(front-.34,front+.34,p.x/1280.0+columns);
  COLOR=vec4(vec3(v),keep);
 }

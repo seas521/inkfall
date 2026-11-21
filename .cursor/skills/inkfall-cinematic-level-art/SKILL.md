@@ -1,110 +1,69 @@
 ---
 name: inkfall-cinematic-level-art
-description: Designs and refactors Inkfall 2D levels to the approved cinematic silhouette standard: multi-plane depth, volumetric lighting, black tactile gameplay silhouettes, dynamic atmosphere, and soft foreground framing. Use when creating level art, reworking an existing level or zone, adding parallax backgrounds, improving platform texture, lighting, fog, dust, foreground, or cinematic 2.5D depth in this project.
+description: >-
+  Design, implement, and review Inkfall level art, scene lighting, layered depth,
+  character light integration, and camera composition using the project's
+  LIMBO-inspired monochrome silhouette direction. Use for forests, mines,
+  transitions, environmental props, atmosphere, focus, and cinematic framing;
+  not for unrelated UI or gameplay-only changes.
 ---
 
 # Inkfall Cinematic Level Art
 
-Apply the visual quality and implementation pattern approved in the original “沉钟雾谷” demo to existing levels without copying its layout or subject matter.
+将环境设计、可交互物、角色、光照与镜头作为同一幅画面处理。当前基调是有空间与体积的黑白剪影：明亮的空气与开口衬出暗色形体，玩法层相对清晰，远近失焦有区别。不要用统一压黑、统一加灰、统一模糊代替设计。
 
-Read [VISUAL_STANDARD.md](VISUAL_STANDARD.md) before editing.
-For character, equipment, or animation work, also read [CHARACTER_STANDARD.md](CHARACTER_STANDARD.md).
+## 阅读入口
 
-## Canonical implementation references
+- 所有关卡美术任务先读 [VISUAL_STANDARD.md](VISUAL_STANDARD.md)。
+- 新区域、整体改版或参考 LIMBO 时，读 [references/limbo-video-study.md](references/limbo-video-study.md)：用户提供攻略的时间码、可确认现象与推断边界。
+- 修改现有第一章渲染、受光或镜头时，读 [references/chapter-integration.md](references/chapter-integration.md)：真实代码入口、分层与画布限制、验收取景。
+- 角色、装备、抽帧和交互动作读 [CHARACTER_STANDARD.md](CHARACTER_STANDARD.md)。当前第一章沿用现有角色；历史实验角色不是替换指令。
 
-Inspect these files before building a level-specific version:
+## 关键决策
 
-- `scripts/demos/cinematic_depth_demo_controller.gd`: gameplay-plane silhouettes and integration
-- `scripts/art/cinematic_depth_art.gd`: far/mid parallax and atmosphere
-- `scripts/art/cinematic_light_art.gd`: light placement and shader-backed cones
-- `scripts/art/cinematic_foreground_art.gd`: foreground framing
-- `assets/shaders/cinematic_light_cone.gdshader`: animated volumetric light
-- `scripts/actors/actor_pose_state.gd`: shared semantic animation contract
-- `scripts/actors/actor_style_host.gd`: legacy/new style switching
-- `scripts/actors/crooked_tower_vector_actor.gd`: default independent-SVG player
-- `scripts/actors/crooked_tower_vector_manifest.gd`: frame counts, timing, canvas, and pivot contract
-- `assets/art/actors/crooked_tower_vector/`: one SVG file per action frame
-- `scripts/tools/build_crooked_tower_vector_frames.gd`: pose-to-pose vector frame builder
-- `scripts/actors/crooked_tower_actor.gd`: preserved GPT-atlas experiment
-- `assets/art/actors/crooked_tower/`: preserved GPT source strips and processed atlases
-- `scripts/actors/shadow_frame_library.gd`: preserved procedural frame experiment
-- `scripts/actors/shadow_frame_actor.gd`: preserved pumpkin-shadow experiment
-- `scripts/actors/velvet_doll_actor.gd`: preserved experimental procedural style
+1. **先空间，再光，再细节。** 用尺度、前后遮挡、负空间、支撑和空气层说明物体；纹理、裂纹、亮线不能补救错误的空间关系。
+2. **远景内部也分层。** 最远只余大势与雾中残影，次远开始读出树干或建筑，中景才有结构。不能把若干清晰图案排在一张灰幕前。
+3. **同一空间共享光。** 角色、石头、车、地面根据各自受光面、遮挡和材质响应；不能物件变亮、角色永远死黑，也不能全身等亮或白线包边。
+4. **剪影不等于剪纸。** 物件暗面保留质量，安装、落地与包容关系要成立；篮内石头、压架中的车、穿过滑轮的绳须拆分遮挡与运动部件。
+5. **焦点服务操作。** 人物、手脚接触处与当前机关有稳定可辨的边界；远景与极近前景更软。草皮可柔，但不能糊成与人物分离的白雾毯。
+6. **镜头服务空间理解。** 遍历以稳定跟随为主；高差、组合机关、飞跃可逐渐放宽构图，事件结束平顺回归。不要每次起落脚都改变焦点、曝光或倍率。
+7. **动效来自原因。** 灯光跟灯摆，绳随负载，篮随落点，火花来自接触；不可把同周期晃动或屏幕贴片套给所有对象。
+8. **风格统一、区域有节奏。** 第一章使用中性黑白；森林的透光、洞内吊灯、河面的开阔有差异，不给每个新区域重新发明彩色基调。
 
-Treat them as pattern references, not as scene content to duplicate.
+## 工作方式
 
-## Non-negotiable rules
+### 建立当前基线
 
-1. Preserve existing collision, traversal timing, checkpoints, interactions, and camera limits unless the user explicitly requests gameplay changes.
-2. Build at least four readable planes: far background, mid background, gameplay plane, foreground. Atmosphere/light is an additional plane, not a replacement.
-3. Keep walkable ground and platforms as near-black silhouettes with irregular contours and soft black edges.
-4. Never draw white, gray, or colored rim lines along walkable surfaces.
-5. Show platform mass through thickness, overlap, occlusion, underside shape, supports, and contact shadow—not bevel strokes, cracks, rivets, panels, or vector decoration.
-6. Use shader-based volumetric light. Never use static translucent triangles, stacked cone polygons, or a painted glow decal as the primary light.
-7. Light reveals fog and negative space; it must not outline the gameplay surface.
-8. Dust, haze, and light modulation must move. Do not use evenly distributed static white dots.
-9. The player remains the sharpest and most readable element; foreground objects may occlude the scene but not sustained traversal visibility.
-10. Every new level must have its own visual motif, silhouette language, palette, and focal landmarks. Reuse the system, not the demo composition.
-11. Character actions must be driven by semantic pose data and separate high-frame-count clips; do not animate the default player as a runtime limb puppet or draw equipment separately in each level.
+先读实际控制器、渲染节点、资源与碰撞，再运行目标区域。保存当前 Git SHA、涉及文件及原生画面；未提交改动也要备份，不能以 HEAD 代替用户当前版本。回滚只恢复本次修改，保留用户后续工作。
 
-## Workflow
+不得因美术优化改写碰撞、角色比例、动作根节点、机关流程、检查点和死亡条件。镜头可按任务调整，但渲染覆盖、预加载与事件镜头必须同步验证。
 
-### 1. Audit the level
+### 定义一幅能玩的画面
 
-- Read the level controller, platform/collision data, camera behavior, room transitions, hazards, and existing art scripts.
-- Run the level and capture representative frames before editing.
-- Mark gameplay-critical silhouettes and areas where foreground occlusion is unsafe.
+落实在简图或简短设计记录中：
 
-### 2. Write a compact art intent
+- 最远、次远、中景、玩家层、极近前景各有什么，哪里留空。
+- 主光从哪里来，被谁遮住；亮区、过渡区与暗区如何衔接。
+- 玩家先看到什么机关、接触什么部件，哪些轮廓必须分离。
+- 哪个时机需要整体取景，哪个时机保持操作距离。
+- 可动部件的拆分、锚点、前后遮挡及物理反馈。
 
-Define before implementation:
+已有明确授权与布局时直接完成可验收结果，无需逐项请用户决定技术细节。
 
-- one environmental fantasy
-- one dominant large-scale silhouette motif
-- one focal light source or light rhythm
-- one restrained palette with localized bright/saturated exposure
-- far, mid, gameplay, and foreground content
-- motion assignments for fog, dust, hanging objects, and light
+### 实现与复核
 
-Do not pause for approval when the request and level context already determine these choices; implement and show a preview.
+先验证黑白大关系与构图，再接入视差、受光、失焦和动态空气。2D 分层、位图、Shader、Blender 均可，按最终画面选择；概念稿不可直接当一张完整交互背景贴入游戏。需 AI 位图时使用 imagegen 工作流；需新动作素材时先确定当前资源无法满足，再给出符合现有角色的完整描述词。
 
-### 3. Build in passes
+每个阶段查看实际游戏原生截图及连续移动。修轮廓与明暗层级后再加装饰。可接受技术复用，不能照搬同样的树、门框或灯光构图填满新区域。
 
-1. Far plane: large low-contrast masses and a broad exposure window.
-2. Mid plane: structural landmarks with independent parallax and partial fog occlusion.
-3. Gameplay plane: convert collision rectangles into irregular black visual masses while preserving collision exactly.
-4. Light plane: place animated shader cones behind gameplay silhouettes.
-5. Atmosphere: drifting fog plus depth-separated dust.
-6. Foreground: blurred near-black forms, haze, vignette, and restrained grain.
-7. Player integration: contact shadow, local contrast, and spawn-point light composition.
+完成时按 [VISUAL_STANDARD.md](VISUAL_STANDARD.md) 验收。文档研究只做文档校验；运行时代码变更需检查 Godot 解析、Shader、导入、实际渲染、镜头过渡及相关交互。
 
-Validate a frame after each major pass. Fix hierarchy before adding detail.
+## 参考与实现的边界
 
-### 4. Keep art modular
+视频说明可见效果，不证明原作引擎实现。将“观察”“设计解释”“Inkfall 实现建议”分开；不能把编码模糊、手机叠层、剪辑切点或剧情发光物当作风格参数。参考构图与原理，制作本项目自己的场景与资产。
 
-Prefer this level-local structure:
+视频研究和项目验收是共同依据。不得声称某个模糊半径、曝光值、物理参数或自动对焦机制来自原作，除非有独立来源。
 
-- `scripts/art/<level>_depth_art.gd`
-- `scripts/art/<level>_light_art.gd`
-- `scripts/art/<level>_foreground_art.gd`
-- `assets/shaders/<level>_light_cone.gdshader` only when the shared shader cannot express the scene
+## 交付
 
-Each art node should expose `sync(delta, camera_axis, active)`. Put depth and light behind the gameplay controller; put foreground above it. Keep rendering code out of gameplay logic except platform silhouette drawing and lamp fixtures that must align with collision.
-
-### 5. Verify
-
-- Run Godot headlessly to catch parse, shader, and import errors.
-- Render or capture the actual target level at spawn and at representative traversal points.
-- Observe at least several seconds of motion to verify dust, fog, light, parallax, and foreground behavior.
-- Check the acceptance list in [VISUAL_STANDARD.md](VISUAL_STANDARD.md).
-- Leave the requested level playable with its original controls and progression.
-
-## Handoff
-
-Report:
-
-- the level/zone changed
-- the new visual motif and layer structure
-- which gameplay behavior was intentionally preserved
-- validation performed
-- one embedded preview image when available
+说明实际完成的区域或规则、关键视觉变化、验证方式与未解决的问题；有画面改动时提供原生预览或明确的前后对照。不要用“已达到原作品质”替代证据。

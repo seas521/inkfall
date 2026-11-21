@@ -12,6 +12,7 @@ var clock:=0.
 var banks:Node2D
 var camera_x:=0.
 var camera_y:=0.
+var framing_zoom:=1.0
 func _ready()->void:
  light=ColorRect.new();light.size=Vector2(1280,720);light.mouse_filter=Control.MOUSE_FILTER_IGNORE
  light.material=ShaderMaterial.new();light.material.shader=FAR_SHADER;light.material.set_shader_parameter("forest",FAR);add_child(light)
@@ -31,26 +32,31 @@ func _ready()->void:
    tree.texture_filter=CanvasItem.TEXTURE_FILTER_LINEAR
    var mat=ShaderMaterial.new();mat.shader=INK
    mat.set_shader_parameter("tone",[.042,.019,.009][depth]);mat.set_shader_parameter("strength",[.24,.54,.77][depth])
-   mat.set_shader_parameter("softness",[9.,4.5,2.][depth]);mat.set_shader_parameter("root_haze",[.85,.55,.30][depth])
+   mat.set_shader_parameter("softness",[9.,4.5,2.][depth]);mat.set_shader_parameter("root_haze",1.0)
    tree.material=mat;add_child(tree)
-   trees.append({"sprite":tree,"x":x,"height":height,"root":[525.,590.,650.][depth]+sin(i*1.7)*30.,"ratio":[.15,.30,.48][depth]})
-func sync(cx:float,cy:float,enabled:bool)->void:
+   trees.append({"sprite":tree,"x":x,"height":height,"root":[525.,590.,650.][depth]+sin(i*1.7)*30.,"ratio":[.15,.30,.48][depth],"scale":tree.scale})
+func sync(cx:float,cy:float,enabled:bool,lens_zoom:float=1.0)->void:
  visible=enabled
  if not enabled:return
- camera_x=cx;camera_y=cy;clock+=get_process_delta_time()
+ camera_x=cx;camera_y=cy;framing_zoom=lens_zoom;clock+=get_process_delta_time()
+ light.material.set_shader_parameter("framing_zoom",lens_zoom)
+ banks.scale=Vector2.ONE*lens_zoom;banks.position=Vector2(640,360)*(1.-lens_zoom)
  light.material.set_shader_parameter("scroll",cx);light.material.set_shader_parameter("camera_y",cy);light.material.set_shader_parameter("clock",clock)
  for item in trees:
   var tree:Sprite2D=item.sprite
-  tree.position=Vector2(item.x-cx*item.ratio,item.root-cy*item.ratio-item.height*.5)
+  tree.position=Vector2(640,360)+(Vector2(item.x-cx*item.ratio,item.root-cy*item.ratio-item.height*.5)-Vector2(640,360))*lens_zoom
+  tree.scale=item.scale*lens_zoom
   tree.visible=tree.position.x> -500 and tree.position.x<1780
  banks.queue_redraw()
 func _draw_banks()->void:
  # A separate, broad rear bank drifts between the distant light and middle trees.
  # Its low contrast never reads as a new playable platform or horizontal fog strip.
  var poly=PackedVector2Array()
- for sx in range(-80,1361,32):
+ for sx in range(-400,1681,32):
   var wx=float(sx)+camera_x*.19
   var y=595.+sin(wx*.0021)*49.+sin(wx*.0047+.8)*20.-camera_y*.19
   poly.append(Vector2(sx,y))
- poly.append(Vector2(1360,900));poly.append(Vector2(-80,900))
+ var bottom:=1200.
+ for point in poly:bottom=maxf(bottom,point.y+300.)
+ poly.append(Vector2(1680,bottom));poly.append(Vector2(-400,bottom))
  banks.draw_colored_polygon(poly,Color(.008,.008,.008,.18))

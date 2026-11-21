@@ -565,14 +565,10 @@ func _draw_collapse()->void:
 func _draw()->void:
 	if not visible:return
 	var floor_y:float=trial.ground(EDGE_X)
-	var face:=PackedVector2Array([Vector2(EDGE_X-150,floor_y),Vector2(EDGE_X,floor_y)])
-	var a:=Vector2(EDGE_X,floor_y)
-	var b:=Vector2(EDGE_X+12,floor_y+38)
-	var c:=Vector2(EDGE_X-10,floor_y+105)
-	for i in range(1,13):
-		var t:=float(i)/12
-		face.append(a.lerp(b,t).lerp(b.lerp(c,t),t))
-	face.append(Vector2(EDGE_X+2,floor_y+600));face.append(Vector2(EDGE_X-150,floor_y+600))
+	var edge:=preload("res://scripts/chapters/mine_gap_rock_shape.gd").left_edge(floor_y)
+	var face:=PackedVector2Array([Vector2(EDGE_X-260,floor_y)])
+	face.append_array(edge);face.append(Vector2(EDGE_X-260,edge[-1].y))
+
 	draw_colored_polygon(face,Color(.003,.003,.003))
 	# Draw the physical stop in contact with the front wheel.
 	if chock_present:Chock.draw_stone(self,chock_body.position)

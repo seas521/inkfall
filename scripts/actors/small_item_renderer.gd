@@ -3,6 +3,11 @@ extends Node2D
 var item_kind: StringName = &""
 var item_radius := 8.0
 
+func _ready()->void:
+	# Ground/air/held variants are separate nodes. All represent the same
+	# interactive playing plane, not a distant-background decoration.
+	add_to_group(&"chapter_gameplay_focus")
+
 func configure(next_kind: StringName, next_radius: float) -> void:
 	var normalized_radius := maxf(4.0, next_radius)
 	if item_kind == next_kind and is_equal_approx(item_radius, normalized_radius):
@@ -102,15 +107,13 @@ func _draw_ink_stone() -> void:
 		if y > 0.0:
 			y *= 0.9
 		points.append(Vector2(x, y))
-	# The land is drawn with a softened edge; a hard-edged polygon beside it looks pasted on. Two
-	# translucent, slightly larger copies give the stone the same soft rim.
+	# The playing-plane lens already supplies optical softness. Expanded
+	# translucent copies made a detached gray halo against the bright forest.
 	var ink := Color("050606")
-	for ring in [[1.16, 0.16], [1.08, 0.32]]:
-		var grown := PackedVector2Array()
-		for point in points:
-			grown.append(point * float(ring[0]))
-		draw_colored_polygon(grown, Color(ink.r, ink.g, ink.b, float(ring[1])))
 	draw_colored_polygon(points, ink)
+	var contour:=points.duplicate()
+	contour.append(points[0])
+	draw_polyline(contour,ink,.65,true)
 
 func _draw_wood() -> void:
 	var start := Vector2(-item_radius, item_radius * 0.42)

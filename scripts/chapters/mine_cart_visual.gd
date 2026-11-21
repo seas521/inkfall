@@ -33,6 +33,7 @@ func _notification(what:int)->void:
 		rendered=false
 
 func _ready()->void:
+	add_to_group(&"chapter_gameplay_focus")
 	back_view=_view(false);front_view=_view(true)
 	back=_sprite(back_view,3);front=_sprite(front_view,6)
 

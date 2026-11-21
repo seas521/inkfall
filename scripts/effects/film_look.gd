@@ -1,7 +1,7 @@
 extends CanvasLayer
 
 # The whole game seen through old film: see assets/shaders/film_look.gdshader.
-# F10 switches it off and on, for comparison.
+# Always present the final artwork; runtime input does not bypass the lens.
 
 const SHADER: Shader = preload("res://assets/shaders/film_look.gdshader")
 const GROUP := &"film_look"
@@ -30,7 +30,7 @@ func _process(delta:float)->void:
 			lens_material.set_shader_parameter("environment_softness",0.0)
 			lens_material.set_shader_parameter("player_plane_focus",0.0)
 
-func set_player_plane_focus(enabled:bool,coverage:Texture2D,centre:Vector2)->void:
+func set_player_plane_focus(enabled:bool,coverage:Texture2D,centre:Vector2,span:Vector2=Vector2(.5,.5))->void:
 	if lens_material==null:return
 	lens_material.set_shader_parameter("player_plane_focus",1.0 if enabled else 0.0)
 	if not enabled:
@@ -38,6 +38,7 @@ func set_player_plane_focus(enabled:bool,coverage:Texture2D,centre:Vector2)->voi
 		return
 	lens_material.set_shader_parameter("player_coverage",coverage)
 	lens_material.set_shader_parameter("player_focus_center",centre)
+	lens_material.set_shader_parameter("player_focus_span",span)
 
 func set_environment_softness(amount:float)->void:
 	if lens_material!=null:lens_material.set_shader_parameter("environment_softness",clampf(amount,0,1))
@@ -64,7 +65,3 @@ func _ready() -> void:
 	lens_material=material
 	rect.material = material
 	add_child(rect)
-
-func _unhandled_input(event: InputEvent) -> void:
-	if event is InputEventKey and event.pressed and not event.echo and event.keycode == KEY_F10:
-		visible = not visible

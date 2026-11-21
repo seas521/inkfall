@@ -140,9 +140,14 @@ func _draw_ground(canvas:Node2D)->void:
 		var start:=left-20.0 if section==0 else left
 		var x:=lerpf(start,left+width,i/128.0)
 		base.append(Vector2(x,float(rest_floor_at.call(x))-1.5+sin(i*2.17)*0.4))
-	base.append(Vector2(left+width,float(rest_floor_at.call(left+width))+600))
+	var bottom:float=float(rest_floor_at.call(left+width))+600.
+	if section==1:
+		var edge:=preload("res://scripts/chapters/mine_gap_rock_shape.gd").left_edge(float(rest_floor_at.call(left+width)))
+		for i in range(1,edge.size()):base.append(edge[i])
+		bottom=edge[-1].y
+	else:base.append(Vector2(left+width,bottom))
 	var start:=left-20.0 if section==0 else left
-	base.append(Vector2(start,float(rest_floor_at.call(start))+600))
+	base.append(Vector2(start,bottom))
 	canvas.draw_colored_polygon(base,Color.BLACK)
 
 func light_at(x:float)->float:
