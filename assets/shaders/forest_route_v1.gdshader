@@ -1,4 +1,5 @@
 shader_type canvas_item;
+uniform float framing_zoom=1.0;
 uniform sampler2D forest_plate : filter_linear_mipmap, repeat_disable;
 uniform float scroll = -9840.0;
 uniform float clock = 0.0;
@@ -7,7 +8,7 @@ uniform float reveal_edge = 2.0;
 float hash(vec2 p){return fract(sin(dot(p,vec2(127.1,311.7)))*43758.5453);}
 float noise(vec2 p){vec2 i=floor(p);vec2 f=fract(p);f=f*f*(3.0-2.0*f);return mix(mix(hash(i),hash(i+vec2(1,0)),f.x),mix(hash(i+vec2(0,1)),hash(i+vec2(1,1)),f.x),f.y);}
 void fragment(){
- vec2 p=UV*vec2(1280.0,720.0);
+ vec2 p=vec2(640,360)+(UV*vec2(1280,720)-vec2(640,360))/framing_zoom;
  // An oversized, world-anchored shot; no texture repeat or camera-centred lamp.
  vec2 q=vec2((p.x+(scroll+9200.0)*0.55)/3900.0,(p.y-ground_y+760.0)/1300.0);
  vec3 col=vec3(0.0);
@@ -47,7 +48,7 @@ void fragment(){
  float front=reveal_edge+(noise(vec2(UV.y*5.0,3.0))-0.5)*0.28+(UV.y-0.5)*0.18;
  float world=(p.x+scroll)/1280.0;
  float columns=(noise(vec2(world*16.0,1.0))-0.5)*0.20+(noise(vec2(world*5.0,UV.y*3.0))-0.5)*0.14;
- float keep=1.0-smoothstep(front-0.34,front+0.34,SCREEN_UV.x+columns);
+ float keep=1.0-smoothstep(front-0.34,front+0.34,p.x/1280.0+columns);
  // Background trunks retain one low, constant exposure so the black
  // shelter and hazards remain distinct in front; never a root gradient.
  value=0.045+value*0.92;

@@ -2,10 +2,10 @@ extends Node2D
 # Unlike the atmospheric planes these trees occupy real bank positions.
 # No collision: near trunks sit behind play, foreground stems frame the banks.
 const KIT=preload("res://scripts/art/valley_forest_depth.gd")
-# The existing route props provide the player-plane silhouettes. Add no rear
-# trunks; only one foreground accent frames the wide bank. Hazards stay clear.
+# Existing route props provide the player-plane silhouettes. Keep the river
+# banks open: the large foreground trunk obscured the player and shore.
 const REAR_SPECS=[]
-const FRONT_SPECS=[Vector3(2460,1,1540)]
+const FRONT_SPECS=[]
 var level:Node2D
 var front:=false
 var trees:Array=[]

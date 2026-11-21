@@ -83,9 +83,11 @@ func _ready()->void:
  # live at actual rear depths, not all on the player's plane.
  for i in 6:
   var fixture:=Pendant.new();fixture.lamp_index=i
+  fixture.set_meta("light_plane",&"background")
   fixture.position=ORIGIN+Vector2(Pendant.BULBS[i].x,Pendant.ANCHOR_Y[i])
   fixture.z_as_relative=false;fixture.z_index=3 if i<4 else 1
   add_child(fixture);lamps.append(fixture)
+  if i==1:fixture.hide()
  lamp=lamps[1];far_lamp=lamps[3]
  for x:float in bays:
   var cart:=Cart.new();add_child(cart);carts.append(cart)
@@ -287,6 +289,7 @@ func tick_cart_control(delta:float)->bool:
  relay.velocities[index]=dx/maxf(delta,.001)
  relay.positions[index]=Vector2(bays[index],relay.EXIT_Y if index==1 and relay.cart_landed else relay.track_y(bays[index]))
  cart_bodies[index].position=relay.positions[index]
+ if index==1:relay.release_exit_cart()
  carts_joined=absf(absf(bays[1]-bays[0])-gap_width)<.5
  gap.route.fall_origin=gap.route.feet().y
  return true

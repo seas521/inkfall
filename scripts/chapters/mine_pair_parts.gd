@@ -325,11 +325,14 @@ func sync_basket_front()->void:
   var nearest:=Vector2.ZERO
   var nearest_distance:=INF
   for fixture in room.lamps:
+   if not fixture.is_visible_in_tree() or fixture.get_meta("light_plane",&"background")!=&"gameplay":continue
    var bulb:Vector2=fixture.light_position()
    if bulb.distance_squared_to(mouth)<nearest_distance:
     nearest=bulb;nearest_distance=bulb.distance_squared_to(mouth)
   basket_wall_material.set_shader_parameter("basket_mouth",mouth)
   basket_wall_material.set_shader_parameter("basket_lamp",nearest)
+  basket_wall_material.set_shader_parameter("basket_wall",nearest_distance<INF)
+  basket_wall_material.set_shader_parameter("flat_ink_tone",-1.0 if nearest_distance<INF else .0015)
 func set_restraint_rise(distance:float)->void:
  clamp_rise=clampf(distance,0,CLAMP_TRAVEL)
  moving_clamp.position=room.ORIGIN+clamp_rest-Vector2(0,clamp_rise)

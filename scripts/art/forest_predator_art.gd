@@ -16,7 +16,7 @@ const TREE_SCALE:=Layout.TREE_SCALE
 const PLANT_SCALE:=0.35
 const TREE_ROOT:=Layout.TREE_ROOT
 const BRANCH_TIP:=Layout.BRANCH_TIP
-const ROPE_LENGTH:=146.0
+const ROPE_LENGTH:=Layout.ROPE_LENGTH
 var encounter
 var clip_frames:Array[Texture2D]=[]
 var clip_sprite:Sprite2D
@@ -57,7 +57,12 @@ func _ready()->void:
 	rope.antialiased=true
 	rope.points=PackedVector2Array([Vector2.ZERO,Vector2(0.8,48),Vector2(-0.5,100),Vector2(0,ROPE_LENGTH)])
 	hanger.add_child(rope)
-	carcass=_sprite(Rect2(640,250,300,600),material_value)
+	# This small bait shares the plant/player plane. Reusing the tree's
+	# diffusion blurred its narrow body once more before the chapter lens.
+	var carcass_ink:=material_value.duplicate() as ShaderMaterial
+	carcass_ink.set_shader_parameter("edge_softness",0.25)
+	carcass_ink.set_shader_parameter("coverage_recovery",1.0)
+	carcass=_sprite(Rect2(640,250,300,600),carcass_ink)
 	carcass.scale=Vector2.ONE*0.14
 	carcass.position=Vector2(0,ROPE_LENGTH)-Vector2(130,50)*0.14
 	hanger.add_child(carcass)
@@ -80,7 +85,7 @@ func _ready()->void:
 	loose=Node2D.new()
 	loose.z_index=3
 	add_child(loose)
-	loose_sprite=_sprite(Rect2(640,250,300,600),material_value)
+	loose_sprite=_sprite(Rect2(640,250,300,600),carcass_ink)
 	loose_sprite.scale=Vector2.ONE*0.14
 	loose_sprite.position=-Vector2(130,50)*0.14
 	loose.add_child(loose_sprite)
@@ -129,7 +134,7 @@ func sync(delta:float,camera_x:float,camera_y:float,active:bool)->void:
 	var right:=PLANT_X+150
 	var carrying_visible:bool=encounter!=null and encounter.owns_bait()
 	var bait_visible:bool=encounter!=null and encounter.bait in [encounter.Bait.FLYING,encounter.Bait.GROUND] and absf(encounter.bait_position.x-camera_x-640)<900
-	visible=active and ((camera_x<right+200 and camera_x+1280>left-200) or carrying_visible or bait_visible) and camera_y< -4000
+	visible=active and ((camera_x<right+600 and camera_x+1280>left-600) or carrying_visible or bait_visible) and camera_y< -4000
 	if not visible:return
 	clock+=delta
 	hanger.rotation=encounter.hanging_angle() if encounter!=null else 0.0

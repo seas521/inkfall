@@ -28,13 +28,15 @@ const STATION_DEBUG_INDEX := 9
 const SCREE_DEBUG_INDEX := 10
 const ROOT_CLIFF_DEBUG_INDEX := 11
 const VALLEY_ENTRY_DEBUG_INDEX := 17
-const MAX_DEBUG_INDEX := 17
+const FOG_BAY_DEBUG_INDEX := 18
+const MAX_DEBUG_INDEX := 18
 # Keep stable launch IDs for stored scenes and old standalone test tools.
 # Only these three gameplay entries are exposed in either menu.
 const DEBUG_ENTRIES := [
 	{"id":SCENE1_DEBUG_INDEX,"title":"第一章 · 完整版","detail":"上方森林 → 悬崖绳梯 → 崖间树枝 → 矿洞 → 谷底森林"},
 	{"id":ROPE_LADDER_DEBUG_INDEX,"title":"测试 · 悬崖绳梯","detail":"从绳梯顶部进入；可沿第一章路线继续向下游玩"},
 	{"id":VALLEY_ENTRY_DEBUG_INDEX,"title":"测试 · 谷底森林入口","detail":"从矿洞出口进入谷底森林；保留矿洞与森林的往返衔接"},
+	{"id":FOG_BAY_DEBUG_INDEX,"title":"测试 · 雾湾行船与绳梯","detail":"浅滩上船 → 挥扇渡水 → 跳抓旧绳梯上岸；Esc 返回菜单"},
 ]
 const CHAPTER_ROUTE := "res://scenes/chapters/chapter_01_route.tscn"
 const DEBUG_RETURN_META := &"inkfall_debug_return"
@@ -42,7 +44,7 @@ const RiverTransition = preload("res://scripts/levels/level01_river_transition.g
 const FilmLook = preload("res://scripts/effects/film_look.gd")
 
 @export_category("DEBUG")
-@export_enum("运行时关卡菜单:0", "第一章 · 完整版:5", "测试 · 悬崖绳梯:8", "测试 · 谷底森林入口:18")
+@export_enum("运行时关卡菜单:0", "第一章 · 完整版:5", "测试 · 悬崖绳梯:8", "测试 · 谷底森林入口:18", "测试 · 雾湾行船与绳梯:19")
 var debug_start_level: int = 0
 
 var game_context = GameContext.new()
@@ -172,6 +174,9 @@ func _show_debug_selector() -> void:
 	queue_redraw()
 
 func _start_debug_level() -> void:
+	if debug_selection==FOG_BAY_DEBUG_INDEX:
+		get_tree().change_scene_to_file("res://scenes/debug/fog_bay_playable_v91.tscn")
+		return
 	if debug_selection==12:
 		get_tree().change_scene_to_file("res://scenes/demos/mine_art_gallery.tscn")
 		return

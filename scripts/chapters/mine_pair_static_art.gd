@@ -33,11 +33,12 @@ func registered(role:int)->ShaderMaterial:
  material.set_shader_parameter("structure_mask",STRUCTURE);material.set_shader_parameter("foreground_mask",FRONT)
  material.set_shader_parameter("gallery_mask",GALLERY);material.set_shader_parameter("supports_mask",BACK_SUPPORTS)
  material.set_shader_parameter("props_mask",KIT);material.set_shader_parameter("layer_role",role)
+ material.set_shader_parameter("left_feather",.12)
  return material
 func _ready()->void:
  _mass(Rect2(room.ORIGIN+Vector2(0,941),Vector2(3600,2600)))
  _mass(Rect2(room.ORIGIN-Vector2(0,800),Vector2(3600,800)))
- var wall_material:=registered(0);wall_material.set_shader_parameter("left_feather",.065)
+ var wall_material:=registered(0);wall_material.set_shader_parameter("left_feather",.12)
  far=_plate(SOURCE,0,wall_material)
  back_supports=_plate(SOURCE,1,registered(4))
  far_gallery=_plate(SOURCE,2,registered(3))
@@ -59,6 +60,7 @@ func _mass(bounds:Rect2)->void:
  var polygon:=Polygon2D.new();polygon.color=Color(.001,.001,.001)
  polygon.z_as_relative=false;polygon.z_index=0
  polygon.polygon=PackedVector2Array([bounds.position,Vector2(bounds.end.x,bounds.position.y),bounds.end,Vector2(bounds.position.x,bounds.end.y)])
+ if bounds.position.y>room.MID_Y:polygon.material=preload("res://scripts/chapters/mine_gap_rock_shape.gd").solid_material()
  add_child(polygon)
 func _plate(texture:Texture2D,depth:int,material_value:Material)->Sprite2D:
  var view:=SubViewport.new();view.size=Vector2i(1672,941)
@@ -72,6 +74,7 @@ func _plate(texture:Texture2D,depth:int,material_value:Material)->Sprite2D:
   sprite.texture=Softness.texture(self,sprite.texture,1.5,true)
  sprite.z_as_relative=false;sprite.z_index=depth;sprite.texture_filter=CanvasItem.TEXTURE_FILTER_LINEAR
  var material:=ShaderMaterial.new();material.shader=LIGHT_RESPONSE
+ preload("res://scripts/chapters/mine_gap_rock_shape.gd").configure(material)
  material.set_shader_parameter("receives_light",depth<=2)
  sprite.material=material;add_child(sprite);layers.append(sprite)
  return sprite

@@ -31,6 +31,8 @@ func restore_fixture()->void:
 	update_swing(0)
 
 func _ready()->void:
+	if not has_meta("light_plane"):set_meta("light_plane",&"gameplay")
+	if get_meta("light_plane")==&"gameplay":add_to_group(&"chapter_gameplay_focus")
 	swing=Node2D.new();add_child(swing)
 	swing.draw.connect(_draw_wire)
 	var sprite:=Sprite2D.new()

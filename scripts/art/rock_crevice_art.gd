@@ -34,7 +34,7 @@ func burst(x:float)->void:
 		chips.append({"p":Vector2(x+rng.randf_range(-16,16),Layout.ceiling(x,Callable())+3),"v":Vector2(rng.randf_range(-55,55),rng.randf_range(-25,40)),"age":0.,"size":rng.randf_range(1.,3.8)})
 		chips_spawned+=1
 func sync(delta:float,camera_x:float,camera_y:float,active:bool)->void:
-	visible=active and camera_y< -3900 and camera_x+1280>Layout.ART_LEFT-100 and camera_x<Layout.ART_RIGHT+100
+	visible=active and camera_y< -3900 and camera_x+1280>Layout.ART_LEFT-500 and camera_x<Layout.ART_RIGHT+500
 	if not visible or scene.level.paused:return
 	var frame:=Engine.get_physics_frames()
 	if frame==last_frame:return

@@ -87,7 +87,7 @@ static func grave_position()->Vector2:
 const WALK_SPEED_FROM := 118.0
 const WALK_SPEED_TO := 48.0
 const STOP_TIME := 0.45  # tired_stop from its 8th frame to its last (27 frames at 60 fps)
-const PANT_TIME := 3.3  # the bent-over breathing before the flock comes
+const PANT_TIME := 0.65  # brief breath, then immediate flock approach; no long dead pause
 const BREATH_TIME := 1.0  # one loop of tired_idle
 const FLOCK_IMPACT_TIME := 0.82  # (SURFACE_BAT_IMPACT_TIME in level 1)
 const FLOCK_VISUAL_TIME := 2.35  # (SURFACE_BAT_VISUAL_DURATION)

@@ -1,0 +1,143 @@
+{
+  "version": "fog-bay-static-v90",
+  "reference": "artifacts/fog-bay-v89/concept/low-shoal-high-bank.png",
+  "layers": [
+    {
+      "file": "00-distant-atmosphere.png",
+      "source_size": [
+        1914,
+        822
+      ],
+      "canvas_size": [
+        1914,
+        822
+      ],
+      "mode": "RGB",
+      "sha256": "ca79806070636a8abe370e5271ce468d159d4955108b925e14f4a674467912cb",
+      "origin": [
+        0,
+        0
+      ],
+      "scale": [
+        1.0,
+        1
+      ]
+    },
+    {
+      "file": "10-water-reflection.png",
+      "source_size": [
+        1914,
+        822
+      ],
+      "canvas_size": [
+        1914,
+        822
+      ],
+      "mode": "RGBA",
+      "sha256": "f754729633b72df6d0a3e2d3d4dacbfefce3036ee995c993310d23e35a13a514",
+      "origin": [
+        0,
+        0
+      ],
+      "scale": [
+        1.0,
+        1
+      ]
+    },
+    {
+      "file": "20-left-shoal.png",
+      "source_size": [
+        1913,
+        822
+      ],
+      "canvas_size": [
+        1914,
+        822
+      ],
+      "mode": "RGBA",
+      "sha256": "e2adb7b8076f3cc482d607da4e7bbde36a1bab4fe1cc73aad5e01915cf9f0328",
+      "origin": [
+        0,
+        0
+      ],
+      "scale": [
+        1.0005227391531626,
+        1
+      ]
+    },
+    {
+      "file": "30-right-bank-tree.png",
+      "source_size": [
+        1913,
+        822
+      ],
+      "canvas_size": [
+        1914,
+        822
+      ],
+      "mode": "RGBA",
+      "sha256": "1c5d951b778471c68719744c87c1df3a8d1cbc901ed4a7b26f95ce2c679331e5",
+      "origin": [
+        0,
+        0
+      ],
+      "scale": [
+        1.0005227391531626,
+        1
+      ]
+    },
+    {
+      "file": "40-near-foliage.png",
+      "source_size": [
+        1913,
+        822
+      ],
+      "canvas_size": [
+        1914,
+        822
+      ],
+      "mode": "RGBA",
+      "sha256": "2121dfb619dd784f73980dd713ac65d2cffb60eccaff303d1d1d68c4afb709d8",
+      "origin": [
+        0,
+        0
+      ],
+      "scale": [
+        1.0005227391531626,
+        1
+      ]
+    }
+  ],
+  "reflection_policy": {
+    "static": [
+      "distant light",
+      "static right bank and tree",
+      "shore reed environment"
+    ],
+    "excluded": [
+      "boat",
+      "player",
+      "boat wake",
+      "boat reflection",
+      "player reflection"
+    ],
+    "dynamic_stage": "not implemented in this static-resource delivery"
+  },
+  "foreground_source": "sharp alpha silhouette; optional separable Gaussian scene material is independent",
+  "layout": "low left shoal disappearing underwater; open lake; high right bank",
+  "material_policy": {
+    "player_plane": "both banks, roots, tree trunk/canopy and dry soil: near-black, no visible photographic surface texture",
+    "foreground": "sharp source; optional separate two-pass Gaussian",
+    "underwater": "Restore translucent pre-blackening shoal; preserve submerged gray soil and fading depth. shoal_material only darkens exposed dry strip, independent of lens softness.",
+    "lighting": "do not darken the fog or water to match solid objects",
+    "right_bank": "Near-black silhouette with low-frequency volume sampled from auxiliary source; fine bark/rock texture suppressed; gradual water contact from y495 to582."
+  },
+  "shore_contact": "separate static registered immersion material; requires live water field binding in gameplay integration",
+  "auxiliary_sources": [
+    {
+      "file": "right-bank-volume-source.png",
+      "purpose": "Material-only low-frequency form; never displayed as a textured plate",
+      "sha256": "3081f39ac87baf858c75166c689cd77c364daf55f4221279bb51c3ecca2cda11"
+    }
+  ]
+}

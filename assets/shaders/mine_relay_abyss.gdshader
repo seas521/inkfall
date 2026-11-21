@@ -11,5 +11,5 @@ void fragment(){
  float strata=.5+.5*sin(UV.x*19.0+sin(UV.y*4.1)*.7);
  float distant_rock=1.0-.16*pow(strata,3.0)*smoothstep(.02,.20,UV.y);
  c*=exp(-depth*1.35)*distant_rock;
- COLOR=vec4(c,smoothstep(0.0,.025,UV.y)*(1.-smoothstep(2480.,2980.,world_x)));
+ COLOR=vec4(c,smoothstep(0.0,.025,UV.y)*(1.-smoothstep(1740.,2260.,world_x)));
 }

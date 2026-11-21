@@ -1,6 +1,7 @@
 extends Node2D
 
 const Marsh = preload("res://scripts/demos/c_zone_debug/marsh_art.gd")
+const OVERSCAN:=Vector2(336,192)
 const INK := Color("050606")
 const Scene1Ink = preload("res://scripts/demos/c_zone_debug/scene1_ink.gd")
 var ladder
@@ -12,7 +13,7 @@ var fog: ColorRect
 
 func _ready() -> void:
 	viewport = SubViewport.new()
-	viewport.size = Vector2i(1328,768)
+	viewport.size = Vector2i(1952,1104)
 	viewport.transparent_bg = true
 	viewport.disable_3d = true
 	viewport.msaa_2d = Viewport.MSAA_4X
@@ -51,8 +52,8 @@ func sync(origin: Vector2, enabled: bool) -> void:
 	viewport.render_target_update_mode = SubViewport.UPDATE_ALWAYS if enabled else SubViewport.UPDATE_DISABLED
 	if not enabled:
 		return
-	ink.position = -origin.round()+Vector2(24,24)
-	output.position = origin.round()-Vector2(24,24)
+	ink.position = -origin.round()+OVERSCAN
+	output.position = origin.round()-OVERSCAN
 	(fog.material as ShaderMaterial).set_shader_parameter("clock",ladder.clock)
 	(fog.material as ShaderMaterial).set_shader_parameter("camera_y",origin.y)
 	(fog.material as ShaderMaterial).set_shader_parameter("strength",ladder.entry_mix())

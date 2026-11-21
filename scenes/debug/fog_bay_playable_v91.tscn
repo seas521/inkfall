@@ -1,0 +1,4 @@
+[gd_scene load_steps=2 format=3]
+[ext_resource type="Script" path="res://scripts/demos/fog_bay_playable_v91/controller.gd" id="1"]
+[node name="FogBayPlayable" type="Node2D"]
+script=ExtResource("1")

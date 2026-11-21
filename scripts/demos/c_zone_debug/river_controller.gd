@@ -137,14 +137,17 @@ const ROCK_RESIST_RAMP := 0.15  # s to dig in
 @export var return_to_debug_menu := false
 var hosted_in_level := false
 var cinematic_entry := false
+# V64: rebuilt from the approved shore composition. Dry surfaces and the
+# collision polygons use the same contour; submerged continuation stays deep.
 var LEFT_PROFILE := PackedVector2Array([
-	Vector2(-520, 280), Vector2(-360, 292), Vector2(-220, 306), Vector2(-120, 320), Vector2(5, 365), Vector2(225, 550),
-	Vector2(1090, 550), Vector2(1180, 584), Vector2(1270, 630),
-	Vector2(1350, 850), Vector2(-520, 850)
+ Vector2(-520,280),Vector2(-360,292),Vector2(-220,306),Vector2(-120,320),Vector2(5,365),Vector2(225,550),
+ Vector2(560,550),Vector2(700,515),Vector2(850,465),Vector2(940,490),Vector2(1010,510),
+ Vector2(1080,530),Vector2(1135,555),Vector2(1180,584),Vector2(1270,700),Vector2(1400,850),Vector2(-520,1000)
 ])
 var RIGHT_PROFILE := PackedVector2Array([
-	Vector2(1880, 850), Vector2(1950, 625), Vector2(2110, 550),
-	Vector2(2800, 550), Vector2(2800, 850)
+ Vector2(1720,850),Vector2(1850,670),Vector2(1940,595),Vector2(1980,575),
+ Vector2(2070,538),Vector2(2180,492),Vector2(2300,458),Vector2(2440,442),
+ Vector2(2540,465),Vector2(2690,520),Vector2(2800,550),Vector2(2800,1000)
 ])
 # Top contours of every solid piece of land in the second act. Collision and art share them.
 var MARSH_LANDS: Array[PackedVector2Array] = [
@@ -805,7 +808,7 @@ func _physics_process(delta: float) -> void:
 	_update_water_contact(delta, previous_lowest, previous_feet_y)
 	if floating:
 		art.raft_waves(crate.position.x + CRATE_SIZE.x * 0.5, CRATE_SIZE.x * 0.5, crate.velocity.x, sink_speed, rock_speed, delta)
-	elif player.is_on_floor() and player.position.y + PLAYER_SIZE.y > WATER_Y + 8.0 and absf(player.velocity.x) > 20.0 and player.position.x + 13.0 > 1156.0 and player.position.x + 13.0 < 2060.0:
+	elif player.is_on_floor() and player.position.y + PLAYER_SIZE.y > WATER_Y + 8.0 and absf(player.velocity.x) > 20.0 and player.position.x + 13.0 > 1156.0 and player.position.x + 13.0 < 1980.0:
 		art.wade_waves(player.position.x + 13.0, player.velocity.x, delta)
 	if floating and is_riding() and not riding:
 		sink_speed += clampf(impact_speed * 0.09, 14.0, 48.0)
@@ -862,6 +865,10 @@ func _physics_process(delta: float) -> void:
 # Up the cliff the camera climbs with the player; in the forest above it the player stands low in the picture (ground at about
 # three quarters of the way down), as everywhere else; elsewhere it holds level.
 func _camera_target_y() -> float:
+	# Lower the view into the water rather than leaving the surface at the
+	# bottom quarter. This reveals the front bank as in the approved concept.
+	if player.position.x>650.0 and player.position.x<2730.0:
+		return 120.0*smoothstep(650.0,1120.0,player.position.x)*(1.0-smoothstep(2150.0,2730.0,player.position.x))
 	if player.position.x < -300.0:
 		# scenes 1 to 6: the camera follows him up there, and comes back to level at the foot of the cliff
 		return minf(0.0, player.position.y - 500.0) if player.position.y < 100.0 else 0.0
@@ -1185,27 +1192,15 @@ func _apply_fan_wind() -> void:
 	wind_impulses += 1
 
 func ground_y(x: float) -> float:
-	if x <= -120.0:
-		return lerpf(280.0,320.0,clampf((x+520.0)/400.0,0.0,1.0))
-	if x <= 5.0:
-		return lerpf(320.0,365.0,(x+120.0)/125.0)
-	if x <= 225.0:
-		return lerpf(365.0,550.0,(x-5.0)/220.0)
-	if x <= 1090.0:
-		return 550.0
-	if x <= 1180.0:
-		return lerpf(550.0, 584.0, (x - 1090.0) / 90.0)
-	if x <= 1270.0:
-		return lerpf(584.0, 630.0, (x - 1180.0) / 90.0)
-	if x < 1350.0:
-		return lerpf(630.0, 850.0, (x - 1270.0) / 80.0)
-	if x < 1880.0:
-		return 850.0
-	if x < 1950.0:
-		return lerpf(850.0, 625.0, (x - 1880.0) / 70.0)
-	if x < 2110.0:
-		return lerpf(625.0, 550.0, (x - 1950.0) / 160.0)
-	return 550.0
+	if x < LEFT_PROFILE[0].x:return LEFT_PROFILE[0].y
+	if x > RIGHT_PROFILE[-2].x:return RIGHT_PROFILE[-2].y
+	for profile in [LEFT_PROFILE,RIGHT_PROFILE]:
+		# The final point closes the solid; it is not part of the walking surface.
+		for i in range(profile.size()-2):
+			var a:Vector2=profile[i]
+			var b:Vector2=profile[i+1]
+			if x>=a.x and x<=b.x:return lerpf(a.y,b.y,(x-a.x)/(b.x-a.x))
+	return 850.0
 
 # The hooded boy's boat is a hull with a waterline, not a raft: it rides higher, and does not sink under him (the raft
 # sank 11 px, which on a deeper hull looks like a wreck).
@@ -1266,7 +1261,7 @@ func crate_waterline_span() -> Vector2:
 
 func _update_water_contact(delta: float, previous_lowest: float, previous_feet_y: float) -> void:
 	var lowest := _lowest_crate_y()
-	var in_river := crate.position.x + CRATE_SIZE.x > 1156.0 and crate.position.x < 2060.0
+	var in_river := crate.position.x + CRATE_SIZE.x > 1156.0 and crate.position.x < 1980.0
 	if not crate_wet and in_river and lowest > WATER_Y + 0.5:
 		crate_wet = true
 		var span := crate_waterline_span()
@@ -1274,7 +1269,7 @@ func _update_water_contact(delta: float, previous_lowest: float, previous_feet_y
 	elif not in_river or lowest < WATER_Y - 6.0:
 		crate_wet = false
 	var feet := player.position + Vector2(13, 54)
-	var player_in_river := feet.x > 1156.0 and feet.x < 2060.0
+	var player_in_river := feet.x > 1156.0 and feet.x < 1980.0
 	if not player_wet and player_in_river and feet.y > WATER_Y + 2.0 and not is_riding():
 		player_wet = true
 		art.emit_water_impact(feet.x, maxf(0.0, (feet.y - previous_feet_y) / delta), 16.0, true)
@@ -1294,7 +1289,7 @@ func bank_downhill_direction() -> float:
 func _update_crate(delta: float, direction: float, riding: bool) -> void:
 	var slope := bank_slope_angle()
 	var downhill := bank_downhill_direction()
-	var entering_slope := dragging and grip_time <= 0.0 and direction * downhill > 0.0 and absf(slope) > deg_to_rad(5.0)
+	var entering_slope := dragging and grip_time <= 0.0 and direction * downhill > 0.0 and absf(slope) > deg_to_rad(5.0) and direction*sin(slope)>0.0
 	if not floating and not launching and entering_slope:
 		launching = true
 		beached = false
@@ -1308,7 +1303,7 @@ func _update_crate(delta: float, direction: float, riding: bool) -> void:
 	var was_floating := floating
 	# A wet bow is not enough: the wide raft must clear the bank before leveling.
 	var water_contact := _lowest_crate_y() >= WATER_Y and _shore_limit(0.0) >= _unloaded_float_y() + 12.0
-	var water_support := crate.position.x + CRATE_SIZE.x * 0.5 > 1156.0 and crate.position.x < 2065.0 and (was_floating or water_contact)
+	var water_support := crate.position.x + CRATE_SIZE.x * 0.5 > 1156.0 and crate.position.x < 1985.0 and (was_floating or water_contact)
 	if was_floating and not launching and crate.velocity.x * downhill < -0.5 and _shore_limit(crate_tilt, crate.velocity.x * delta) <= _unloaded_float_y() + load_sink + 2.0:
 		beached = true
 		crate.velocity.x = 0.0
@@ -2455,9 +2450,9 @@ func _present(delta: float) -> void:
 	if iris == null:
 		iris = ScreenIris.new()
 		add_child(iris)
-	var camera_origin := camera.position - Vector2(640.0, 360.0)
-	iris.call("set_state", _curtain_alpha(), player.position + PLAYER_SIZE * 0.5 - camera_origin)
 	art.sync(delta, camera_x, true)
+	var iris_center:Vector2=(get_canvas_transform()*(player.position+PLAYER_SIZE*.5))/get_viewport_rect().size*Vector2(1280,720)
+	iris.call("set_state",_curtain_alpha(),iris_center)
 	marsh_art.sync(delta, camera_x, true)
 	if descent != null:
 		descent.art.sync(delta, Vector2(camera_x,camera_y),true)

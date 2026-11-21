@@ -93,6 +93,8 @@ var restoring:=false
 var rolling_back:=false
 var previous_feet:=Vector2.ZERO
 var cart_landed:=false
+var arrival_checkpoint:=false
+var exit_cart_falling:=false
 var cart_lost:=[false,false]
 var donor_airborne:=false
 var donor_velocity:=Vector2.ZERO
@@ -170,14 +172,14 @@ func reset(clear_checkpoint:bool=true)->void:
  dismount_lock=0;impact_grace=0;completed=false;terminal_age=0;exit_dwell=0;transition_age=-1
  last_collision={};last_hammer_contact={};landing_speed=0;hand_gap=0
  rolling_back=false
- cart_landed=false;cart_lost=[false,false];donor_airborne=false;donor_velocity=Vector2.ZERO
+ cart_landed=false;exit_cart_falling=false;cart_lost=[false,false];donor_airborne=false;donor_velocity=Vector2.ZERO
  impact_shift=[0.0,0.0];contact_age=-1;contact_cooldown=0;collision_shake=0;warning_strength=0;hammer_age=0;hammer_settling=false
  handoff_done=false
  wrecked=false;wreck_age=0;wreck_strain=0;wreck_spin=0;wreck_impact_speed=0
  if art!=null:art.wreck_parts.clear();art.reset_slider_feedback()
  slider_position=0;slider_velocity=0;slider_distance=0;slider_lamp=0;contact_solver.clear();contact_sides=[1.0,-1.0];rail_joint=[0,0];traction_pitch=[0.0,0.0]
  control_side=-1;lever_stroke=0;motor_engagement=0;brake_amount=1;clutch_release=0;pendulum_live=false
- if clear_checkpoint:checkpoint_active=false;valley_visited=false
+ if clear_checkpoint:checkpoint_active=false;valley_visited=false;arrival_checkpoint=false
  for i in 2:
   positions[i]=Vector2(room.bays[i],track_y(room.bays[i]));pitches[i]=track_angle(room.bays[i])
   if i<room.carts.size():
@@ -232,6 +234,38 @@ func staged()->bool:return absf(room.bays[0]-STAGE_X)<65
 func contact_gap()->float:return CART_GAP
 func on_launch_bend(index:int)->bool:
  return not cart_lost[index] and not (airborne if index==1 else donor_airborne) and not (index==1 and cart_landed) and room.bays[index]>RAMP_START+.5 and room.bays[index]<RAMP_END
+func exit_cart_supported(x:float)->bool:
+ # Once the centre passes the lip, the remaining axle cannot balance the
+ # chassis indefinitely. The right wheel may still contact the bank while
+ # it tips; that unilateral support is resolved in the falling update.
+ return x>=EXIT_X+4.
+func release_exit_cart()->void:
+ if not cart_landed or exit_cart_supported(room.bays[1]):return
+ var speed:float=velocities[1]
+ room.release_cart()
+ cart_landed=false;airborne=true;exit_cart_falling=true;impact_driven[1]=true
+ state=State.FLIGHT;flight_rotation=pitches[1]
+ flight_velocity=Vector2(speed,35.)
+ dismount_lock=.28
+func restore_arrival()->Vector2:
+ room.release_cart();_release_passenger();charge_owner=false
+ if exit_scene.detached:exit_scene.restore_to_mine()
+ if cart_detached:
+  room.carts[1].reparent(room);room.carts[1].position=Vector2.ZERO
+  room.cart_bodies[1].reparent(room);cart_detached=false
+ handoff_done=false;room.gap.route.in_c_zone=false;room.gap.route.active=true
+ cart_landed=true;airborne=false;exit_cart_falling=false;cart_lost[1]=false;completed=true
+ wrecked=false;wreck_age=0.;wreck_strain=0.;rolling_back=false
+ air_active=false;impact_driven[1]=false;ramp_return[1]=false
+ velocities[1]=0.;pitches[1]=0.;suspension[1]=0.;suspension_v[1]=0.
+ state=State.LANDED;dismount_lock=.28
+ room.bays[1]=CART_STOP_X;positions[1]=Vector2(CART_STOP_X,EXIT_Y)
+ room.cart_bodies[1].position=positions[1];room.cart_bodies[1].rotation=0.
+ room.cart_bodies[1].collision_layer=33
+ room.carts[1].set_wreck(0.);art.wreck_parts.clear()
+ room.set_enabled(true)
+ var home_x:=CART_STOP_X+112.
+ return Vector2(home_x,exit_scene.ground_y(home_x))
 func can_manipulate(index:int)->bool:
  return not cart_lost[index] and not (airborne if index==1 else donor_airborne) and absf(velocities[index])<145
 func relay_runup_quality()->float:
@@ -526,6 +560,9 @@ func tick_world(delta:float)->void:
  if state in [State.LANDED,State.FAILED]:terminal_age+=delta
  # Losing an unattended car does not arbitrarily kill a safe player.
  # The crank offers a local retry; genuine passenger falls still fail.
+ if cart_landed and not arrival_checkpoint:
+  var grounded_here:bool=room.gap.level.player.is_on_floor() and p.x>=EXIT_X+24. and absf(p.y-exit_scene.ground_y(p.x))<18.
+  if rider==1 or grounded_here:arrival_checkpoint=true
  if cart_landed and p.x>EXIT_X+260 and rider<0 and room.gap.level.player.is_on_floor():
   completed=true
  if completed and p.x>=ValleyExit.JOIN_X and not handoff_done:_begin_handoff()
@@ -656,6 +693,7 @@ func _advance_contacts(h:float)->void:
  haul_blocked=charge_owner and not contact_solver.last_contacts.is_empty() and absf(angular_speed)<.03
  for event in events:_contact_feedback(event,bodies)
 func _integrate(h:float)->void:
+ release_exit_cart()
  contact_cooldown=maxf(0,contact_cooldown-h)
  warning_strength=0.0;haul_blocked=false
  if state==State.COUNTDOWN:
@@ -727,13 +765,21 @@ func _integrate(h:float)->void:
   var before:Vector2=positions[1]
   flight_velocity.y+=GRAVITY*h;positions[1]+=flight_velocity*h
   room.bays[1]=positions[1].x;distances[1]+=flight_velocity.x*h
-  flight_rotation=move_toward(flight_rotation,atan2(flight_velocity.y,flight_velocity.x),h*.8);pitches[1]=flight_rotation
+  if exit_cart_falling:
+   # Roll tail-first over the lip. The remaining right axle supports the
+   # car until it clears the bank instead of falling through solid earth.
+   flight_rotation=maxf(-PI,flight_rotation-h*.9)
+   var support:=Vector2(24,0).rotated(flight_rotation)
+   if positions[1].x+support.x>=EXIT_X and positions[1].y+support.y>EXIT_Y:
+    positions[1].y=EXIT_Y-support.y;flight_velocity.y=0.
+  else:flight_rotation=move_toward(flight_rotation,atan2(flight_velocity.y,flight_velocity.x),h*.8)
+  pitches[1]=flight_rotation
   var wall_x:float=exit_scene.face_x(positions[1].y-18)
   if before.x<wall_x-24 and positions[1].x>=wall_x-24 and positions[1].y>EXIT_Y+14:
    _crash_into_bank(wall_x)
    return
   if before.y<=EXIT_Y and positions[1].y>=EXIT_Y and flight_velocity.y>0 and positions[1].x>=EXIT_X+20:
-   airborne=false;cart_landed=true;state=State.LANDED;positions[1].y=EXIT_Y;pitches[1]=0
+   airborne=false;exit_cart_falling=false;cart_landed=true;state=State.LANDED;positions[1].y=EXIT_Y;pitches[1]=0
    landing_speed=flight_velocity.length();suspension_v[1]=minf(120,flight_velocity.y*.22);velocities[1]=flight_velocity.x*.70;terminal_age=0
    room.mechanical_impulse(positions[1],.16);art.impact(positions[1],70)
   elif positions[1].y>room.TRACK_Y+650:
@@ -814,6 +860,7 @@ func valley_preview_active()->bool:
  return room!=null and room.enabled and not room.gap.route.in_c_zone and room.gap.level.camera_x>800
 func _begin_handoff()->void:
  if handoff_done:return
+ arrival_checkpoint=true
  var level=room.gap.level
  var foot:Vector2=room.gap.route.feet()-ValleyExit.C_OFFSET
  var velocity:Vector2=level.player.velocity

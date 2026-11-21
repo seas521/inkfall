@@ -82,6 +82,10 @@ func _draw_wall()->void:
   var u0:float=lerpf(.30,.52,float(i)/64)
   var u1:float=lerpf(.30,.52,float(i+1)/64)
   wall.draw_polygon(points,PackedColorArray([Color.WHITE]),PackedVector2Array([Vector2(u0,.13),Vector2(u1,.13),Vector2(u1,.39),Vector2(u0,.39)]),DEPTH)
+  # Continue the same cave air beneath wide framing, without a flat
+  # rectangular backdrop end cutting across the open fracture.
+  var lower:=PackedVector2Array([Vector2(x0,-2390),Vector2(x1,-2390),Vector2(x1,-1650),Vector2(x0,-1650)])
+  wall.draw_polygon(lower,PackedColorArray([Color.WHITE]),PackedVector2Array([Vector2(u0,.39),Vector2(u1,.39),Vector2(u1,.42),Vector2(u0,.42)]),DEPTH)
  # Continuous solid overburden, with broad, quiet changes of direction.
  var roof:=PackedVector2Array([Vector2(-1460,-3900),Vector2(960,-3900)])
  for i in range(64,-1,-1):

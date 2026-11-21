@@ -1,4 +1,5 @@
 shader_type canvas_item;
+uniform float framing_zoom=1.0;
 uniform sampler2D forest_plate : filter_linear_mipmap, repeat_disable;
 uniform sampler2D right_plate : filter_linear_mipmap, repeat_disable;
 uniform float scroll = -9840.0;
@@ -7,9 +8,12 @@ uniform float ground_y = 550.0;
 float hash(vec2 p){return fract(sin(dot(p,vec2(127.1,311.7)))*43758.5453);}
 float noise(vec2 p){vec2 i=floor(p);vec2 f=fract(p);f=f*f*(3.0-2.0*f);return mix(mix(hash(i),hash(i+vec2(1,0)),f.x),mix(hash(i+vec2(0,1)),hash(i+vec2(1,1)),f.x),f.y);}
 void fragment(){
- vec2 p=UV*vec2(1280.0,720.0);
+ // Distant canopy has restrained lens parallax and a safe upper crop.
+ // Wider gameplay framing must not reveal a clamp-stretched texture edge.
+ float far_zoom=mix(1.0,framing_zoom,.35);
+ vec2 p=vec2(640,360)+(UV*vec2(1280,720)-vec2(640,360))/far_zoom;
  // An oversized, world-anchored shot; no texture repeat or camera-centred lamp.
- vec2 q=vec2((p.x+265.0+(scroll+9840.0)*0.55)/1900.0,(p.y-ground_y+540.0)/1000.0);
+ vec2 q=vec2((p.x+265.0+(scroll+9840.0)*0.55)/1900.0,(p.y-ground_y+650.0)/1000.0);
  vec3 col=vec3(0.0);
  float total=0.0;
  for(int y=-2;y<=2;y++){
@@ -55,5 +59,7 @@ void fragment(){
  value*=1.0-0.42*smoothstep(understory,ground_y+80.0,p.y);
  float edge=-8200.0+(noise(vec2(q.y*5.0,2.0))-0.5)*160.0;
  float keep=1.0-smoothstep(edge-350.0,edge+350.0,scroll+p.x);
- COLOR=vec4(vec3(value),keep);
+ float valid=smoothstep(.0,.075,q.x)*(1.-smoothstep(.88,.99,q.x));
+ valid*=smoothstep(.0,.025,q.y)*(1.-smoothstep(.94,1.,q.y));
+ COLOR=vec4(vec3(value),keep*valid);
 }

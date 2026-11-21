@@ -9,8 +9,13 @@ const DescentRoute=preload("res://scripts/chapters/descent_route_act.gd")
 const BridgeToC=preload("res://scripts/chapters/mine_descent_act.gd")
 var post_bridge:Node2D
 var bridge_to_c:Node2D
+var chapter_framing=preload("res://scripts/art/chapter_camera_framing.gd").new()
+
+func sync_chapter_camera(delta:float)->void:
+	chapter_framing.sync(self,delta)
 
 func reset_all() -> void:
+	chapter_framing.reset()
 	if bridge_to_c!=null:bridge_to_c.reset()
 	if post_bridge!=null:post_bridge.reset()
 	super.reset_all()

@@ -223,7 +223,7 @@ DEBUG 菜单第六项「C区第三幕 · 断桥与升降梯」，从第二幕终
 
 ### 全屏胶片质感
 
-画面的质感不靠一层遮罩，而是让每一层的边缘都是软的：地形和玩法剪影的描边（`INK_SHADER`，两圈采样、过渡带约 3 像素）比以前软，前景草稍软；`scripts/effects/film_look.gd` 的全屏后处理（`assets/shaders/film_look.gdshader`，`main.gd` 启动时加载）再用两圈采样做整体柔焦，所以角色等交互层的边缘也是模糊的，眼睛的橙色会化成一点光。此外有亮处的光晕、加重的对比、很轻的颗粒（按物理像素算，放大窗口也不会变粗）、暗角、极轻的闪烁和偶尔的划痕。按 F10 可开关后处理。强度是 shader 里的参数（`softness`、`bloom`、`grain`、`blotch`、`vignette`、`flicker`、`contrast`、`scratches`）。
+画面的质感不靠一层遮罩，而是让每一层的边缘都是软的：地形和玩法剪影的描边（`INK_SHADER`，两圈采样、过渡带约 3 像素）比以前软，前景草稍软；`scripts/effects/film_look.gd` 的全屏后处理（`assets/shaders/film_look.gdshader`，`main.gd` 启动时加载）再用两圈采样做整体柔焦，所以角色等交互层的边缘也是模糊的，眼睛的橙色会化成一点光。此外有亮处的光晕、加重的对比、很轻的颗粒（按物理像素算，放大窗口也不会变粗）、暗角、极轻的闪烁和偶尔的划痕。最终后处理默认开启；F10 开关已于 v54 取消。强度是 shader 里的参数（`softness`、`bloom`、`grain`、`blotch`、`vignette`、`flicker`、`contrast`、`scratches`）。
 
 ### 小修正
 
@@ -275,7 +275,7 @@ DEBUG 菜单第六项「C区第三幕 · 断桥与升降梯」，从第二幕终
 
 ### 胶片效果调弱
 
-`assets/shaders/film_look.gdshader` 的默认强度整体下调，保留更多细节：`softness` 0.9 → 0.45（柔焦少一半，边缘和岩石纹理更清楚）、`contrast` 0.30 → 0.12（暗部不再被压得那么死）、`vignette` 0.55 → 0.32（四角不那么暗）、`bloom` 0.30 → 0.20、`grain` 0.026 → 0.016、`scratches` 0.3 → 0.2。仍然保留颗粒、轻微柔焦、光晕、暗角和闪烁，只是弱一些。按 F10 可以开关后处理来对比。
+`assets/shaders/film_look.gdshader` 的默认强度整体下调，保留更多细节：`softness` 0.9 → 0.45（柔焦少一半，边缘和岩石纹理更清楚）、`contrast` 0.30 → 0.12（暗部不再被压得那么死）、`vignette` 0.55 → 0.32（四角不那么暗）、`bloom` 0.30 → 0.20、`grain` 0.026 → 0.016、`scratches` 0.3 → 0.2。仍然保留颗粒、轻微柔焦、光晕、暗角和闪烁，只是弱一些。最终后处理默认开启；F10 开关已于 v54 取消。
 
 ## 第三幕石堆悬浮与角色/石头边缘不一致
 

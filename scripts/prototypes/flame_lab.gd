@@ -4,7 +4,7 @@ extends Node2D
 #   left   the old flame (inkfall_volume shader plus its soft heat glow), as used in the C zone
 #   middle the new flame as a campfire, with a black silhouette standing beside it
 #   right  the new flame as a hazard strip that bursts on and off between two ledges
-# F10 switches the film look on and off; the film look is attached here so it matches the game.
+# The final film look is attached here so it matches the game.
 
 const InkFlame = preload("res://scripts/effects/ink_flame.gd")
 const FilmLook = preload("res://scripts/effects/film_look.gd")

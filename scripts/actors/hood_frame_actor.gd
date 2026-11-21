@@ -151,7 +151,17 @@ uniform float fog_blur = 0.0;  // texels, from the scene's mist
 uniform bool monochrome = false;
 uniform float texel_scale = 2.6;  // texels per screen pixel (the frames are shrunk about 2.6x on screen)
 uniform float soften = 0.8;  // screen pixels of softness every silhouette gets, so its edge is as soft as the ink around it
+// The live chapter separates depth in the lens. Keep only subpixel source
+// diffusion on its playing plane instead of blurring the boy twice.
+uniform float gameplay_focus = 0.0;
+uniform float forest_environment_blend = 0.0;
 uniform vec3 ink = vec3(0.022, 0.025, 0.025);  // the scene's black is not (0, 0, 0)
+uniform float forest_received_light=0.0;
+uniform sampler2D forest_light_texture : source_color, filter_linear, repeat_disable;
+uniform vec2 forest_light_camera=vec2(0.0);
+uniform float forest_light_clock=0.0;
+#include "res://assets/shaders/valley_light_field.gdshaderinc"
+#include "res://assets/shaders/chapter_light_field.gdshaderinc"
 
 uniform vec2 impact_center=vec2(0.5);
 uniform vec2 impact_radius=vec2(1.0);
@@ -161,7 +171,11 @@ uniform vec2 source_eye = vec2(-1000.0);
 uniform bool source_eye_visible = false;
 uniform sampler2D eye_repair : filter_nearest, repeat_disable;
 varying vec4 actor_tint;
-void vertex(){actor_tint=COLOR;}
+varying vec2 forest_world_position;
+void vertex(){
+ actor_tint=COLOR;
+ forest_world_position=(MODEL_MATRIX*vec4(VERTEX,0.0,1.0)).xy;
+}
 vec4 body_sample(vec4 c,float repair,vec2 at,vec2 pixel_size){
  float amber=smoothstep(0.018,0.085,c.r-max(c.g,c.b))*smoothstep(0.05,0.22,c.r);
  // Seedance bakes a neutral white rim around some amber eyes. Remove the
@@ -180,7 +194,7 @@ void fragment() {
 	vec2 body_uv=UV-impact_push*pressure;
 	body_uv.x-=q.x*abs(impact_push.y)*0.14*pressure;
 	// a ring of 8 taps plus the centre: the edge is a soft, even falloff, not a hard cut-out
-	vec2 px = TEXTURE_PIXEL_SIZE * (fog_blur + soften * texel_scale);
+	vec2 px = TEXTURE_PIXEL_SIZE * (fog_blur + soften * texel_scale) * mix(1.0, mix(0.38,0.72,forest_environment_blend), gameplay_focus);
 	vec4 color = body_sample(texture(TEXTURE,body_uv),texture(eye_repair,body_uv).r,body_uv,TEXTURE_PIXEL_SIZE) * 0.28;
 	color += body_sample(texture(TEXTURE,body_uv + vec2(px.x, 0.0)),texture(eye_repair,body_uv + vec2(px.x, 0.0)).r,body_uv + vec2(px.x, 0.0),TEXTURE_PIXEL_SIZE) * 0.09;
 	color += body_sample(texture(TEXTURE,body_uv - vec2(px.x, 0.0)),texture(eye_repair,body_uv - vec2(px.x, 0.0)).r,body_uv - vec2(px.x, 0.0),TEXTURE_PIXEL_SIZE) * 0.09;
@@ -203,12 +217,59 @@ void fragment() {
 	vec4 original = texture(TEXTURE,UV);
 	float repaired = texture(eye_repair,UV).r;
 	COLOR = color * actor_tint * vec4(original.rgb,max(original.a,repaired));
+	// The old final alpha multiply cut the filtered edge back to the source
+	// silhouette. Let real coverage taper outside it, without changing RGB,
+	// cropping a face, stretching a limb or changing the animation root.
+	COLOR.a=mix(COLOR.a,color.a*actor_tint.a,forest_environment_blend);
 	COLOR.rgb *= 1.0-repaired;
+	if(forest_received_light>0.0 || chapter_light_count>0){
+		vec3 incident=chapter_incident(forest_world_position);
+		if(valley_transport_ready>.5){
+		 float energy=texture(valley_transport_texture,SCREEN_UV).r;
+		 incident=vec3(0.0,-energy,energy);
+		}else if(forest_received_light>0.0){
+		 float sunlight=valley_player_sunlight(forest_light_texture,SCREEN_UV*vec2(1280.,720.),forest_light_camera,forest_light_clock,forest_world_position)*forest_received_light;
+		 incident+=vec3(vec2(.62,-.78)*sunlight,sunlight);
+		}
+		// A silhouette is not a normal map. Alpha-neighbour "facing" split
+		// the boy into painted bright/dark halves and flipped while turning.
+		// Keep the intact dark figure; its gentle diffuse lift and shadow
+		// transitions come from the continuous world light, not a body-side mask.
+		float received=min(incident.z,1.0)*.020;
+		COLOR.rgb+=vec3(received)*max(original.a,repaired)*actor_tint.rgb;
+	}
 }
 """
 	var material := ShaderMaterial.new()
 	material.shader = shader
 	return material
+
+func set_forest_light(enabled:bool,field:Texture2D,camera:Vector2,time:float)->void:
+	if sprite==null or sprite.material==null:return
+	var mat:=sprite.material as ShaderMaterial
+	mat.set_shader_parameter("forest_received_light",1.0 if enabled else 0.0)
+	if not enabled:return
+	mat.set_shader_parameter("forest_light_texture",field)
+	mat.set_shader_parameter("forest_light_camera",camera)
+	mat.set_shader_parameter("forest_light_clock",time)
+
+func set_gameplay_focus(enabled:bool)->void:
+	if sprite!=null and sprite.material!=null:
+		(sprite.material as ShaderMaterial).set_shader_parameter("gameplay_focus",1.0 if enabled else 0.0)
+
+func set_chapter_lights(count:int,sources:PackedVector4Array,axes:PackedVector2Array,barrier_count:int,barriers:PackedVector4Array,canopy:float,time:float,source_canopy:PackedFloat32Array=PackedFloat32Array())->void:
+	if sprite==null or sprite.material==null:return
+	var mat:=sprite.material as ShaderMaterial
+	mat.set_shader_parameter("chapter_light_count",count)
+	mat.set_shader_parameter("chapter_lights",sources)
+	mat.set_shader_parameter("chapter_light_axes",axes)
+	if source_canopy.is_empty():
+		source_canopy.resize(12);source_canopy.fill(canopy)
+	mat.set_shader_parameter("chapter_light_canopy",source_canopy)
+	mat.set_shader_parameter("chapter_barrier_count",barrier_count)
+	mat.set_shader_parameter("chapter_barriers",barriers)
+	mat.set_shader_parameter("chapter_canopy",canopy)
+	mat.set_shader_parameter("chapter_light_clock",time)
 
 # --- clip library -------------------------------------------------------------------------------------
 
@@ -376,6 +437,8 @@ func sync_pose(delta: float, next_pose) -> void:
 		if wanted_clip != current_clip:
 			if wanted_clip == &"climb" or current_clip == &"climb":
 				_begin_ghost(_blend_time(current_clip, wanted_clip), true)
+			elif wanted_clip==&"hanging_pickup":
+				_begin_ghost(0.06)
 			elif wanted_clip in [&"tired_stop", &"tired_idle"] or current_clip in [&"tired_stop", &"tired_idle"]:
 				_begin_ghost(_blend_time(current_clip, wanted_clip))
 			play(wanted_clip)
@@ -394,8 +457,9 @@ func sync_pose(delta: float, next_pose) -> void:
 			anim_speed = float(action.get("speed",1.0))
 			_advance(dt)
 		action_driven = true
-	# All settled rest states use a fixed silhouette: no breathing loop or scale.
-	if current_clip in STATIC_REST_CLIPS:
+	# Ordinary settled rest stays static. The explicitly authored cliff pant
+	# remains controller-driven; it must not be frozen by the idle safeguard.
+	if current_clip in STATIC_REST_CLIPS and pose.action != ActorPoseState.ACTION_PANT:
 		progress=0.0;current_frame_index=0
 	body_lift = FALL_CENTRE if current_clip == &"fall_loop" else 0.0
 	_apply()
@@ -405,6 +469,8 @@ func sync_pose(delta: float, next_pose) -> void:
 	previous_vertical_speed = pose.velocity.y
 
 func _action_frame() -> Dictionary:
+	if pose.action==&"hanging_pickup" and has_clip(&"hanging_pickup"):
+		return {"clip":&"hanging_pickup","progress":pose.action_progress}
 	if pose.small_item_kind in [&"mine_heavy",&"heavy"]:
 		var heavy_clip:StringName=&"hug_hold"
 		match pose.action:
@@ -727,6 +793,7 @@ func _run_frame_after_landing() -> int:
 # How long to cross-fade from one clip into the next: none where the next clip begins on the frame the last one ends
 # on, a little where two poses are merely close, longer from the bent-over panting back to standing.
 func _blend_time(from_clip: StringName, to_clip: StringName) -> float:
+	if from_clip==&"hanging_pickup":return 0.08
 	if from_clip==&"rope_ladder":
 		if to_clip==&"idle_left" and current_frame_index>=232:
 			# The upright exit already matches the idle's size. Superimposing

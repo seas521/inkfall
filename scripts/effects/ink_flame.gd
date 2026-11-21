@@ -235,4 +235,4 @@ func _draw_smoke() -> void:
 		var a: float = float(p.age) / float(p.life)
 		var sz: float = float(p.size) * (1.0 + a * 1.8)
 		var pos: Vector2 = p.pos + Vector2(sin(clock * 1.7 + float(p.ph)) * 5.0 * a, 0.0)
-		_smoke_node.draw_texture_rect(_glow, Rect2(pos - Vector2(sz, sz) * 0.5, Vector2(sz, sz)), false, Color(0.03, 0.025, 0.025, sin(a * PI) * 0.22))
+		_smoke_node.draw_texture_rect(_glow, Rect2(pos - Vector2(sz, sz) * 0.5, Vector2(sz, sz)), false, _tint(Color(0.03, 0.025, 0.025, sin(a * PI) * 0.22)))

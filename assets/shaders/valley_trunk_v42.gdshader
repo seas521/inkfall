@@ -11,6 +11,9 @@ void fragment(){
  a+=(texture(TEXTURE,UV+d).a+texture(TEXTURE,UV-d).a+texture(TEXTURE,UV+vec2(d.x,-d.y)).a+texture(TEXTURE,UV+vec2(-d.x,d.y)).a)*.0625;
  // Alpha only: eliminate generated bark, pale contour and translucent halo.
  a=smoothstep(.08,.92,a)*strength;
- a*=1.-root_haze*smoothstep(.64,.94,UV.y);
+ // These are atmospheric background trunks, not walkable bank trees.
+ // Lose the complete buttress flare inside the rear mist before the
+ // atlas ends, so no detached root can hang over a foreground cliff.
+ a*=1.-root_haze*smoothstep(.60,.84,UV.y);
  COLOR=vec4(vec3(tone),a);
 }
